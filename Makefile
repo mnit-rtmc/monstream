@@ -8,7 +8,7 @@ all:  $(TARGET)
 
 SRC = src
 BUILD = build
-MODULES = player mongrid
+MODULES = player mongrid config
 OBJS = $(addprefix $(BUILD)/, $(addsuffix .o,$(MODULES)))
 
 $(BUILD):

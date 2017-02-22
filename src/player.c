@@ -20,55 +20,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>		/* for memset */
-#include <fcntl.h>
-#include <sys/stat.h>
-
-static char *PATH = "/var/lib/monstream/";
 
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
-ssize_t config_load(const char *name, char *buf, size_t n) {
-	char path[128];
-	int fd;
-
-	strcpy(path, PATH);
-	strcat(path, name);
-
-	fd = open(path, O_RDONLY | O_NOFOLLOW, 0);
-	if (fd >= 0) {
-		ssize_t n_bytes = read(fd, buf, n);
-		if (n_bytes < 0) {
-			fprintf(stderr, "Read error: %lu\n", n);
-			return -1;
-		}
-		buf[n_bytes] = '\0';
-		close(fd);
-		return n_bytes;
-	}
-	return -1;
-}
-
-ssize_t config_store(const char *name, const char *buf, size_t n) {
-	char path[128];
-	int fd;
-	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-
-	strcpy(path, PATH);
-	strcat(path, name);
-
-	fd = open(path, O_WRONLY | O_CREAT, mode);
-	if (fd >= 0) {
-		ssize_t n_bytes = write(fd, buf, n);
-		if (n_bytes < 0) {
-			fprintf(stderr, "Write error: %lu\n", n);
-			return -1;
-		}
-		close(fd);
-		return n_bytes;
-	}
-	return -1;
-}
+ssize_t config_load(const char *name, char *buf, size_t n);
+ssize_t config_store(const char *name, const char *buf, size_t n);
 
 int open_bind(const char *service) {
 	struct addrinfo hints;
