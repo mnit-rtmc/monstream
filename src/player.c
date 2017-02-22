@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <errno.h>
 #include <gtk/gtk.h>
 #include <netdb.h>		/* for socket stuff */
 #define _MULTI_THREADED
@@ -38,8 +39,10 @@ int open_bind(const char *service) {
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
 	rc = getaddrinfo(NULL, service, &hints, &rai);
-	if (rc)
+	if (rc) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
 		return -1;
+	}
 
 	for (ai = rai; ai; ai = ai->ai_next) {
 		int fd = socket(ai->ai_family, ai->ai_socktype,
@@ -205,16 +208,19 @@ static void process_commands(const char *buf, size_t n) {
 void *command_thread(void *data) {
 	char buf[1024];
 	int fd = open_bind("7001");
+	if (fd < 0)
+		goto out;
 	while (true) {
 		ssize_t n = read(fd, buf, 1023);
 		if (n < 0) {
-			fprintf(stderr, "Read error: %lu\n", n);
+			fprintf(stderr, "Read socket: %s\n", strerror(errno));
 			break;
 		}
 		buf[n] = '\0';
 		process_commands(buf, n);
 	}
 	close(fd);
+out:
 	return NULL;
 }
 
