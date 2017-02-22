@@ -25,7 +25,6 @@
 
 static char *PATH = "/var/lib/monstream/";
 
-int32_t mongrid_init(uint32_t num);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
@@ -40,7 +39,7 @@ ssize_t config_load(const char *name, char *buf, size_t n) {
 	if (fd >= 0) {
 		ssize_t n_bytes = read(fd, buf, n);
 		if (n_bytes < 0) {
-			fprintf(stderr, "Read error: %d\n", n);
+			fprintf(stderr, "Read error: %lu\n", n);
 			return -1;
 		}
 		buf[n_bytes] = '\0';
@@ -62,7 +61,7 @@ ssize_t config_store(const char *name, const char *buf, size_t n) {
 	if (fd >= 0) {
 		ssize_t n_bytes = write(fd, buf, n);
 		if (n_bytes < 0) {
-			fprintf(stderr, "Write error: %d\n", n);
+			fprintf(stderr, "Write error: %lu\n", n);
 			return -1;
 		}
 		close(fd);
@@ -246,22 +245,23 @@ static void process_commands(const char *buf, size_t n) {
 	}
 }
 
-static void *command_thread(void *data) {
+void *command_thread(void *data) {
 	char buf[1024];
 	int fd = open_bind("7001");
 	while (true) {
 		ssize_t n = read(fd, buf, 1023);
 		if (n < 0) {
-			fprintf(stderr, "Read error: %d\n", n);
+			fprintf(stderr, "Read error: %lu\n", n);
 			break;
 		}
 		buf[n] = '\0';
 		process_commands(buf, n);
 	}
 	close(fd);
+	return NULL;
 }
 
-static uint32_t load_config(void) {
+uint32_t load_config(void) {
 	char buf[128];
 	ssize_t n = config_load("config", buf, 128);
 	if (n < 0)
@@ -285,23 +285,4 @@ void load_command(const char *fname) {
 		return;
 	const char *end = buf + n;
 	process_command(buf, end);
-}
-
-int main(void) {
-	pthread_t thread;
-	int rc;
-	uint32_t mon = load_config();
-	uint32_t i;
-
-	if (mongrid_init(mon))
-		return -1;
-	for (i = 0; i < mon; i++) {
-		char fname[16];
-		sprintf(fname, "play.%d", i);
-		load_command(fname);
-	}
-	rc = pthread_create(&thread, NULL, command_thread, NULL);
-	gtk_main();
-
-	return 0;
 }

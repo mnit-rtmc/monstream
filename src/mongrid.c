@@ -22,11 +22,13 @@ struct monsink {
 	GstElement	*sink;
 };
 
+#if 0
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "left", -142, NULL);
 	return vbx;
 }
+#endif
 
 static GstElement *make_txt_overlay(const char *desc) {
 	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
@@ -44,7 +46,6 @@ static GstElement *make_txt_overlay(const char *desc) {
 }
 
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
-	struct monsink *ms = (struct monsink *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		printf("End of stream\n");
@@ -148,6 +149,7 @@ static int32_t monsink_play_stream(struct monsink *ms, const char *loc,
 	if (ms->src)
 		monsink_stop_pipeline(ms);
 	monsink_start_pipeline(ms, loc, desc, stype);
+	return 1;
 }
 
 struct mongrid {
