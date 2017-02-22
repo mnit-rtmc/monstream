@@ -22,10 +22,9 @@
 #include <string.h>		/* for memset */
 
 
-int32_t mongrid_init(uint32_t rows, uint32_t cols);
-int32_t mongrid_play_stream(uint32_t row, uint32_t col, const char *loc,
-	const char *desc, const char *stype);
-
+int32_t mongrid_init(uint32_t num);
+int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
+	const char *stype);
 
 int open_bind(const char *service) {
 	struct addrinfo hints;
@@ -59,7 +58,7 @@ int open_bind(const char *service) {
 static const char *param_end(const char *buf, const char *end) {
 	const char *b = buf;
 	while (b < end) {
-		if ('\x1F' == *b)
+		if ('\x1F' == *b || '\x1E' == *b)
 			return b;
 		++b;
 	}
@@ -107,10 +106,24 @@ static void nstr_end(char *dst, const char *end) {
 	*dst = '\0';
 }
 
+static int parse_uint(const char *p, const char *end) {
+	const char *pe = param_end(p, end);
+	char buf[32];
+	size_t n = pe - p;
+	if (n < 32) {
+		memcpy(buf, p, n);
+		buf[n] = '\0';
+		return atoi(buf);
+	} else
+		return -1;
+}
+
 static void process_play(const char *p2, const char *end) {
-	const char *p3 = param_next(p2, end);	// stream URI
-	const char *p4 = param_next(p3, end);	// stream type
-	const char *p5 = param_next(p4, end);	// title
+	const char *p3 = param_next(p2, end);	// camera ID
+	const char *p4 = param_next(p3, end);	// stream URI
+	const char *p5 = param_next(p4, end);	// stream type
+	const char *p6 = param_next(p5, end);	// title
+	int mon = parse_uint(p2, end);
 	char desc[128];
 	char uri[128];
 	char stype[16];
@@ -118,19 +131,20 @@ static void process_play(const char *p2, const char *end) {
 	const char *uend = uri + 128;
 	const char *tend = stype + 16;
 	char *u, *s;
-	char *d = nstr_cpy(desc, dend, p2, end);
-	if (p5 < end) {
+	char *d = nstr_cpy(desc, dend, p3, end);
+	if (p6 < end) {
 		d = nstr_cat(d, dend, " --- ");
-		d = nstr_cpy(d, dend, p5, end);
+		d = nstr_cpy(d, dend, p6, end);
 	}
 //	d = nstr_cat(d, dend, "\n");
-//	d = nstr_cpy(d, dend, p4, end);
+//	d = nstr_cpy(d, dend, p5, end);
 	nstr_end(d, dend);
-	u = nstr_cpy(uri, uend, p3, end);
+	u = nstr_cpy(uri, uend, p4, end);
 	nstr_end(u, uend);
-	s = nstr_cpy(stype, tend, p4, end);
+	s = nstr_cpy(stype, tend, p5, end);
 	nstr_end(s, tend);
-	mongrid_play_stream(0, 0, uri, desc, stype);
+	printf("mon: %d\n", mon);
+	mongrid_play_stream(0, uri, desc, stype);
 }
 
 static void process_stop(const char *p2, const char *end) {
@@ -145,8 +159,7 @@ static void process_config(const char *p2, const char *end) {
 	printf("config!\n");
 }
 
-static void process_command(const char *buf, size_t n) {
-	const char *end = buf + n;
+static void process_command(const char *buf, const char *end) {
 	const char *pe = param_end(buf, end);
 	const char *p2 = param_next(pe, end);
 	if (param_check("play", buf, pe))
@@ -161,6 +174,27 @@ static void process_command(const char *buf, size_t n) {
 		fprintf(stderr, "Invalid command: %s\n", buf);
 }
 
+static const char *command_end(const char *buf, const char *end) {
+	const char *b = buf;
+	while (b < end) {
+		if ('\x1E' == *b)
+			return b;
+		++b;
+	}
+	return end;
+}
+
+static void process_commands(const char *buf, size_t n) {
+	const char *end = buf + n;
+	printf("recv: %s\n", buf);
+	const char *c = buf;
+	while (c < end) {
+		const char *ce = command_end(c, end);
+		process_command(c, ce);
+		c = param_next(ce, end);
+	}
+}
+
 static void *command_thread(void *data) {
 	char buf[1024];
 	int fd = open_bind("7001");
@@ -171,7 +205,7 @@ static void *command_thread(void *data) {
 			break;
 		}
 		buf[n] = '\0';
-		process_command(buf, n);
+		process_commands(buf, n);
 	}
 	close(fd);
 }
@@ -180,16 +214,16 @@ int main(void) {
 	pthread_t thread;
 	int rc;
 
-	if (mongrid_init(2, 2))
+	if (mongrid_init(4))
 		return -1;
 	rc = pthread_create(&thread, NULL, command_thread, NULL);
-	mongrid_play_stream(0, 0, "rtsp://10.80.88.29/axis-media/media.amp",
+	mongrid_play_stream(0, "rtsp://10.80.88.29/axis-media/media.amp",
 		"C123 - Location A", "H264");
-//	mongrid_play_stream(0, 1, "rtsp://10.80.88.30/axis-media/media.amp",
+//	mongrid_play_stream(1, "rtsp://10.80.88.30/axis-media/media.amp",
 //		"C234 - Location B", "H264");
-//	mongrid_play_stream(1, 0, "rtsp://10.80.88.31/axis-media/media.amp",
+//	mongrid_play_stream(2, "rtsp://10.80.88.31/axis-media/media.amp",
 //		"C345 - Location C", "H264");
-//	mongrid_play_stream(1, 1, "rtsp://10.80.88.32/axis-media/media.amp",
+//	mongrid_play_stream(3, "rtsp://10.80.88.32/axis-media/media.amp",
 //		"C456 - Location D", "H264");
 	gtk_main();
 

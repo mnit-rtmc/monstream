@@ -64,8 +64,8 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
-static void monsink_init(struct monsink *ms, uint32_t row, uint32_t col) {
-	snprintf(ms->name, 8, "m%d,%d", row, col);
+static void monsink_init(struct monsink *ms, uint32_t idx) {
+	snprintf(ms->name, 8, "m%d", idx);
 	ms->widget = gtk_drawing_area_new();
 	ms->handle = 0;
 	ms->pipeline = gst_pipeline_new(ms->name);
@@ -157,48 +157,71 @@ struct mongrid {
 	struct monsink	*sinks;
 };
 
-static struct mongrid GRID;
+static struct mongrid grid;
 
 static void mongrid_set_handles(void) {
-	for (uint32_t r = 0; r < GRID.rows; r++) {
-		for (uint32_t c = 0; c < GRID.cols; c++) {
-			uint32_t i = r * GRID.cols + c;
-			struct monsink *ms = GRID.sinks + i;
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct monsink *ms = grid.sinks + i;
 			monsink_set_handle(ms);
 		}
 	}
 }
 
-int32_t mongrid_init(uint32_t rows, uint32_t cols) {
+static uint32_t get_rows(uint32_t num) {
+	uint32_t r = 1;
+	uint32_t c = 1;
+	while (r * c < num) {
+		c++;
+		if (r * c < num)
+			r++;
+	}
+	return r;
+}
+
+static uint32_t get_cols(uint32_t num) {
+	uint32_t r = 1;
+	uint32_t c = 1;
+	while (r * c < num) {
+		c++;
+		if (r * c < num)
+			r++;
+	}
+	return c;
+}
+
+int32_t mongrid_init(uint32_t num) {
 	GtkWidget *window;
-	GtkGrid *grid;
-	if (rows > 4 || cols > 4) {
-		GRID.rows = 0;
-		GRID.cols = 0;
-		fprintf(stderr, "ERROR: Grid too large: %dx%d\n", rows, cols);
+	GtkGrid *gtk_grid;
+	if (num > 16) {
+		grid.rows = 0;
+		grid.cols = 0;
+		fprintf(stderr, "ERROR: Grid too large: %d\n", num);
 		return 1;
 	}
-	GRID.rows = rows;
-	GRID.cols = cols;
-	GRID.sinks = calloc(rows * cols, sizeof(struct monsink));
+	grid.rows = get_rows(num);
+	grid.cols = get_cols(num);
+	num = grid.rows * grid.cols;
+	grid.sinks = calloc(num, sizeof(struct monsink));
 	gst_init(NULL, NULL);
 	gtk_init(NULL, NULL);
 	window = gtk_window_new(0);
-	GRID.window = window;
-	grid = (GtkGrid *) gtk_grid_new();
-	gtk_grid_set_column_spacing(grid, 4);
-	gtk_grid_set_row_spacing(grid, 4);
-	gtk_grid_set_column_homogeneous(grid, TRUE);
-	gtk_grid_set_row_homogeneous(grid, TRUE);
-	for (uint32_t r = 0; r < rows; r++) {
-		for (uint32_t c = 0; c < cols; c++) {
-			uint32_t i = r * cols + c;
-			struct monsink *ms = GRID.sinks + i;
-			monsink_init(ms, r, c);
-			gtk_grid_attach(grid, ms->widget, c, r, 1, 1);
+	grid.window = window;
+	gtk_grid = (GtkGrid *) gtk_grid_new();
+	gtk_grid_set_column_spacing(gtk_grid, 4);
+	gtk_grid_set_row_spacing(gtk_grid, 4);
+	gtk_grid_set_column_homogeneous(gtk_grid, TRUE);
+	gtk_grid_set_row_homogeneous(gtk_grid, TRUE);
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct monsink *ms = grid.sinks + i;
+			monsink_init(ms, i);
+			gtk_grid_attach(gtk_grid, ms->widget, c, r, 1, 1);
 		}
 	}
-	gtk_container_add(GTK_CONTAINER(window), (GtkWidget *) grid);
+	gtk_container_add(GTK_CONTAINER(window), (GtkWidget *) gtk_grid);
 	gtk_window_set_title((GtkWindow *) window, "MonStream");
 	gtk_window_fullscreen((GtkWindow *) window);
 	gtk_widget_show_all(window);
@@ -207,12 +230,11 @@ int32_t mongrid_init(uint32_t rows, uint32_t cols) {
 	return 0;
 }
 
-int32_t mongrid_play_stream(uint32_t row, uint32_t col, const char *loc,
-	const char *desc, const char *stype)
+int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
+	const char *stype)
 {
-	if (row < GRID.rows && col < GRID.cols) {
-		uint32_t i = row * GRID.cols + col;
-		struct monsink *ms = GRID.sinks + i;
+	if (idx < grid.rows * grid.cols) {
+		struct monsink *ms = grid.sinks + idx;
 		return monsink_play_stream(ms, loc, desc, stype);
 	} else
 		return 1;
