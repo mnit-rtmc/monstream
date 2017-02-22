@@ -20,11 +20,56 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>		/* for memset */
+#include <fcntl.h>
+#include <sys/stat.h>
 
+static char *PATH = "/var/lib/monstream/";
 
 int32_t mongrid_init(uint32_t num);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
+
+ssize_t config_load(const char *name, char *buf, size_t n) {
+	char path[128];
+	int fd;
+
+	strcpy(path, PATH);
+	strcat(path, name);
+
+	fd = open(path, O_RDONLY | O_NOFOLLOW, 0);
+	if (fd >= 0) {
+		ssize_t n_bytes = read(fd, buf, n);
+		if (n_bytes < 0) {
+			fprintf(stderr, "Read error: %d\n", n);
+			return -1;
+		}
+		buf[n_bytes] = '\0';
+		close(fd);
+		return n_bytes;
+	}
+	return -1;
+}
+
+ssize_t config_store(const char *name, const char *buf, size_t n) {
+	char path[128];
+	int fd;
+	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+
+	strcpy(path, PATH);
+	strcat(path, name);
+
+	fd = open(path, O_WRONLY | O_CREAT, mode);
+	if (fd >= 0) {
+		ssize_t n_bytes = write(fd, buf, n);
+		if (n_bytes < 0) {
+			fprintf(stderr, "Write error: %d\n", n);
+			return -1;
+		}
+		close(fd);
+		return n_bytes;
+	}
+	return -1;
+}
 
 int open_bind(const char *service) {
 	struct addrinfo hints;
@@ -118,7 +163,8 @@ static int parse_uint(const char *p, const char *end) {
 		return -1;
 }
 
-static void process_play(const char *p2, const char *end) {
+static void process_play(const char *buf, const char *end) {
+	const char *p2 = param_next(buf, end);	// mon index
 	const char *p3 = param_next(p2, end);	// camera ID
 	const char *p4 = param_next(p3, end);	// stream URI
 	const char *p5 = param_next(p4, end);	// stream type
@@ -132,6 +178,7 @@ static void process_play(const char *p2, const char *end) {
 	const char *tend = stype + 16;
 	char *u, *s;
 	char *d = nstr_cpy(desc, dend, p3, end);
+	char fname[16];
 	if (p6 < end) {
 		d = nstr_cat(d, dend, " --- ");
 		d = nstr_cpy(d, dend, p6, end);
@@ -144,7 +191,9 @@ static void process_play(const char *p2, const char *end) {
 	s = nstr_cpy(stype, tend, p5, end);
 	nstr_end(s, tend);
 	printf("mon: %d\n", mon);
-	mongrid_play_stream(0, uri, desc, stype);
+	mongrid_play_stream(mon, uri, desc, stype);
+	sprintf(fname, "play.%d", mon);
+	config_store(fname, buf, (end - buf));
 }
 
 static void process_stop(const char *p2, const char *end) {
@@ -152,24 +201,26 @@ static void process_stop(const char *p2, const char *end) {
 }
 
 static void process_monitor(const char *p2, const char *end) {
-	printf("monitor!\n");
+	int mon = parse_uint(p2, end);
+	printf("monitor: %d\n", mon);
 }
 
-static void process_config(const char *p2, const char *end) {
-	printf("config!\n");
+static void process_config(const char *buf, const char *end) {
+	config_store("config", buf, (end - buf));
+	exit(0);
 }
 
 static void process_command(const char *buf, const char *end) {
 	const char *pe = param_end(buf, end);
 	const char *p2 = param_next(pe, end);
 	if (param_check("play", buf, pe))
-		process_play(p2, end);
+		process_play(buf, end);
 	else if (param_check("stop", buf, pe))
 		process_stop(p2, end);
 	else if (param_check("monitor", buf, pe))
 		process_monitor(p2, end);
 	else if (param_check("config", buf, pe))
-		process_config(p2, end);
+		process_config(buf, end);
 	else
 		fprintf(stderr, "Invalid command: %s\n", buf);
 }
@@ -210,21 +261,46 @@ static void *command_thread(void *data) {
 	close(fd);
 }
 
+static uint32_t load_config(void) {
+	char buf[128];
+	ssize_t n = config_load("config", buf, 128);
+	if (n < 0)
+		return 1;
+	const char *end = buf + n;
+	const char *pe = param_end(buf, end);
+	if (param_check("config", buf, pe)) {
+		const char *p2 = param_next(pe, end);
+		int m = parse_uint(p2, end);
+		return (m > 0) ? m : 1;
+	} else {
+		fprintf(stderr, "Invalid command: %s\n", buf);
+		return 1;
+	}
+}
+
+void load_command(const char *fname) {
+	char buf[128];
+	ssize_t n = config_load(fname, buf, 128);
+	if (n < 0)
+		return;
+	const char *end = buf + n;
+	process_command(buf, end);
+}
+
 int main(void) {
 	pthread_t thread;
 	int rc;
+	uint32_t mon = load_config();
+	uint32_t i;
 
-	if (mongrid_init(4))
+	if (mongrid_init(mon))
 		return -1;
+	for (i = 0; i < mon; i++) {
+		char fname[16];
+		sprintf(fname, "play.%d", i);
+		load_command(fname);
+	}
 	rc = pthread_create(&thread, NULL, command_thread, NULL);
-	mongrid_play_stream(0, "rtsp://10.80.88.29/axis-media/media.amp",
-		"C123 - Location A", "H264");
-//	mongrid_play_stream(1, "rtsp://10.80.88.30/axis-media/media.amp",
-//		"C234 - Location B", "H264");
-//	mongrid_play_stream(2, "rtsp://10.80.88.31/axis-media/media.amp",
-//		"C345 - Location C", "H264");
-//	mongrid_play_stream(3, "rtsp://10.80.88.32/axis-media/media.amp",
-//		"C456 - Location D", "H264");
 	gtk_main();
 
 	return 0;
