@@ -175,7 +175,7 @@ struct mongrid {
 	uint32_t	rows;
 	uint32_t	cols;
 	GtkWidget	*window;
-	struct moncell	*sinks;
+	struct moncell	*cells;
 };
 
 static struct mongrid grid;
@@ -184,7 +184,7 @@ static void mongrid_set_handles(void) {
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.sinks + i;
+			struct moncell *mc = grid.cells + i;
 			moncell_set_handle(mc);
 		}
 	}
@@ -224,7 +224,7 @@ int32_t mongrid_init(uint32_t num) {
 	grid.rows = get_rows(num);
 	grid.cols = get_cols(num);
 	num = grid.rows * grid.cols;
-	grid.sinks = calloc(num, sizeof(struct moncell));
+	grid.cells = calloc(num, sizeof(struct moncell));
 	gst_init(NULL, NULL);
 	gtk_init(NULL, NULL);
 	window = gtk_window_new(0);
@@ -237,7 +237,7 @@ int32_t mongrid_init(uint32_t num) {
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.sinks + i;
+			struct moncell *mc = grid.cells + i;
 			moncell_init(mc, i);
 			gtk_grid_attach(gtk_grid, mc->widget, c, r, 1, 1);
 		}
@@ -253,7 +253,7 @@ int32_t mongrid_init(uint32_t num) {
 
 void mongrid_set_id(uint32_t idx, const char *mid) {
 	if (idx < grid.rows * grid.cols) {
-		struct moncell *mc = grid.sinks + idx;
+		struct moncell *mc = grid.cells + idx;
 		return moncell_set_id(mc, mid);
 	}
 }
@@ -262,7 +262,7 @@ int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype)
 {
 	if (idx < grid.rows * grid.cols) {
-		struct moncell *mc = grid.sinks + idx;
+		struct moncell *mc = grid.cells + idx;
 		return moncell_play_stream(mc, loc, desc, stype);
 	} else
 		return 1;
