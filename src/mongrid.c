@@ -58,7 +58,7 @@ static GstElement *make_src_rtsp(const char *loc) {
 
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -28, NULL);
+	g_object_set(G_OBJECT(vbx), "bottom", -40, NULL);
 	return vbx;
 }
 
@@ -78,7 +78,7 @@ static GstElement *make_txt_overlay(const char *desc, enum align a,
 {
 	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
 	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
-	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 14", NULL);
+	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 20", NULL);
 	g_object_set(G_OBJECT(ovl), "shaded-background", FALSE, NULL);
 	g_object_set(G_OBJECT(ovl), "shading-value", 255, NULL);
 	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
