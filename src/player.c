@@ -155,7 +155,7 @@ static void process_play(const char *buf, const char *end) {
 	config_store(fname, buf, (end - buf));
 }
 
-static void process_stop(const char *p2, const char *end) {
+static void process_stop(const char *buf, const char *end) {
 	printf("stop!\n");
 }
 
@@ -184,7 +184,7 @@ static void process_command(const char *buf, const char *end) {
 	if (param_check("play", buf, pe))
 		process_play(buf, end);
 	else if (param_check("stop", buf, pe))
-		process_stop(p2, end);
+		process_stop(buf, end);
 	else if (param_check("monitor", buf, pe))
 		process_monitor(buf, end);
 	else if (param_check("config", buf, pe))
