@@ -24,6 +24,7 @@
 
 struct monsink {
 	char		name[8];
+	char		mid[8];
 	GtkWidget	*widget;
 	guintptr	handle;
 	GstElement	*pipeline;
@@ -62,14 +63,14 @@ static GstElement *make_txt_overlay(const char *desc) {
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
-		printf("End of stream\n");
+		fprintf(stderr, "End of stream\n");
 		break;
 	case GST_MESSAGE_ERROR: {
 		gchar *debug;
 		GError *error;
 		gst_message_parse_error(msg, &error, &debug);
 		g_free(debug);
-		printf("Error: %s\n", error->message);
+		fprintf(stderr, "Error: %s\n", error->message);
 		g_error_free(error);
 		break;
 	}
@@ -81,6 +82,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 
 static void monsink_init(struct monsink *ms, uint32_t idx) {
 	snprintf(ms->name, 8, "m%d", idx);
+	memset(ms->mid, 0, 8);
 	ms->widget = gtk_drawing_area_new();
 	ms->handle = 0;
 	ms->pipeline = gst_pipeline_new(ms->name);
@@ -97,7 +99,6 @@ static void monsink_init(struct monsink *ms, uint32_t idx) {
 static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
 	struct monsink *ms = (struct monsink *) data;
 	GstPad *spad = gst_element_get_static_pad(ms->depay, "sink");
-printf("source_pad_added\n");
 	gst_pad_link(pad, spad);
 	gst_object_unref(spad);
 }
@@ -164,6 +165,10 @@ static int32_t monsink_play_stream(struct monsink *ms, const char *loc,
 		monsink_stop_pipeline(ms);
 	monsink_start_pipeline(ms, loc, desc, stype);
 	return 1;
+}
+
+static void monsink_set_id(struct monsink *ms, const char *mid) {
+	strncpy(ms->mid, mid, 8);
 }
 
 struct mongrid {
@@ -244,6 +249,13 @@ int32_t mongrid_init(uint32_t num) {
 	gtk_widget_realize(window);
 	mongrid_set_handles();
 	return 0;
+}
+
+void mongrid_set_id(uint32_t idx, const char *mid) {
+	if (idx < grid.rows * grid.cols) {
+		struct monsink *ms = grid.sinks + idx;
+		return monsink_set_id(ms, mid);
+	}
 }
 
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,

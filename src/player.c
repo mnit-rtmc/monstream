@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>		/* for memset */
 
+void mongrid_set_id(uint32_t idx, const char *mid);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
@@ -149,7 +150,6 @@ static void process_play(const char *buf, const char *end) {
 	nstr_end(u, uend);
 	s = nstr_cpy(stype, tend, p5, end);
 	nstr_end(s, tend);
-	printf("mon: %d\n", mon);
 	mongrid_play_stream(mon, uri, desc, stype);
 	sprintf(fname, "play.%d", mon);
 	config_store(fname, buf, (end - buf));
@@ -159,9 +159,17 @@ static void process_stop(const char *p2, const char *end) {
 	printf("stop!\n");
 }
 
-static void process_monitor(const char *p2, const char *end) {
+static void process_monitor(const char *buf, const char *end) {
+	const char *p2 = param_next(buf, end);	// mon index
+	const char *p3 = param_next(p2, end);	// monitor ID
 	int mon = parse_uint(p2, end);
-	printf("monitor: %d\n", mon);
+	char mid[8];
+	const char *mend = mid + 8;
+	char fname[16];
+	char *m = nstr_cpy(mid, mend, p3, end);
+	nstr_end(m, mend);
+	sprintf(fname, "monitor.%d", mon);
+	config_store(fname, buf, (end - buf));
 }
 
 static void process_config(const char *buf, const char *end) {
@@ -177,7 +185,7 @@ static void process_command(const char *buf, const char *end) {
 	else if (param_check("stop", buf, pe))
 		process_stop(p2, end);
 	else if (param_check("monitor", buf, pe))
-		process_monitor(p2, end);
+		process_monitor(buf, end);
 	else if (param_check("config", buf, pe))
 		process_config(buf, end);
 	else
@@ -196,7 +204,6 @@ static const char *command_end(const char *buf, const char *end) {
 
 static void process_commands(const char *buf, size_t n) {
 	const char *end = buf + n;
-	printf("recv: %s\n", buf);
 	const char *c = buf;
 	while (c < end) {
 		const char *ce = command_end(c, end);
