@@ -85,7 +85,7 @@ static GstElement *make_txt_overlay(const char *desc, enum align a,
 	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
 	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
 	g_object_set(G_OBJECT(ovl), "wrap-mode", -1, NULL); // no wrapping
-	g_object_set(G_OBJECT(ovl), "xpad", 0, NULL);
+	g_object_set(G_OBJECT(ovl), "xpad", 8, NULL);
 	g_object_set(G_OBJECT(ovl), "ypad", 0, NULL);
 	return ovl;
 }
