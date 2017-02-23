@@ -180,7 +180,6 @@ static void process_config(const char *buf, const char *end) {
 
 static void process_command(const char *buf, const char *end) {
 	const char *pe = param_end(buf, end);
-	const char *p2 = param_next(pe, end);
 	if (param_check("play", buf, pe))
 		process_play(buf, end);
 	else if (param_check("stop", buf, pe))
