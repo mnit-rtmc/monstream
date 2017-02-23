@@ -38,40 +38,6 @@ struct moncell {
 	GstElement	*sink;
 };
 
-static GstElement *make_videobox(void) {
-	GstElement *vbx = gst_element_factory_make("videobox", NULL);
-//	g_object_set(G_OBJECT(vbx), "left", -142, NULL);
-	return vbx;
-}
-
-enum align {
-	ALIGN_LEFT,
-	ALIGN_CENTER,
-	ALIGN_RIGHT,
-};
-enum valign {
-	VALIGN_BASELINE,
-	VALIGN_BOTTOM,
-	VALIGN_TOP,
-};
-
-static GstElement *make_txt_overlay(const char *desc, enum align a,
-	enum valign va)
-{
-	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
-	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
-	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 14", NULL);
-	g_object_set(G_OBJECT(ovl), "shaded-background", TRUE, NULL);
-	g_object_set(G_OBJECT(ovl), "shading-value", 224, NULL);
-	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
-	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
-	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
-	g_object_set(G_OBJECT(ovl), "wrap-mode", -1, NULL); // no wrapping
-	g_object_set(G_OBJECT(ovl), "xpad", 0, NULL);
-	g_object_set(G_OBJECT(ovl), "ypad", 0, NULL);
-	return ovl;
-}
-
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
@@ -123,6 +89,40 @@ static GstElement *make_src(const char *loc) {
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	return src;
+}
+
+static GstElement *make_videobox(void) {
+	GstElement *vbx = gst_element_factory_make("videobox", NULL);
+//	g_object_set(G_OBJECT(vbx), "left", -142, NULL);
+	return vbx;
+}
+
+enum align {
+	ALIGN_LEFT,
+	ALIGN_CENTER,
+	ALIGN_RIGHT,
+};
+enum valign {
+	VALIGN_BASELINE,
+	VALIGN_BOTTOM,
+	VALIGN_TOP,
+};
+
+static GstElement *make_txt_overlay(const char *desc, enum align a,
+	enum valign va)
+{
+	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
+	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
+	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 14", NULL);
+	g_object_set(G_OBJECT(ovl), "shaded-background", TRUE, NULL);
+	g_object_set(G_OBJECT(ovl), "shading-value", 224, NULL);
+	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
+	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
+	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
+	g_object_set(G_OBJECT(ovl), "wrap-mode", -1, NULL); // no wrapping
+	g_object_set(G_OBJECT(ovl), "xpad", 0, NULL);
+	g_object_set(G_OBJECT(ovl), "ypad", 0, NULL);
+	return ovl;
 }
 
 static GstElement *make_sink(void) {
