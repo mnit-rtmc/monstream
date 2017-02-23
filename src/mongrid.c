@@ -22,7 +22,7 @@
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 
-struct monsink {
+struct moncell {
 	char		name[8];
 	char		mid[8];
 	GtkWidget	*widget;
@@ -80,25 +80,25 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
-static void monsink_init(struct monsink *ms, uint32_t idx) {
-	snprintf(ms->name, 8, "m%d", idx);
-	memset(ms->mid, 0, 8);
-	ms->widget = gtk_drawing_area_new();
-	ms->handle = 0;
-	ms->pipeline = gst_pipeline_new(ms->name);
-	ms->bus = gst_pipeline_get_bus(GST_PIPELINE(ms->pipeline));
-	gst_bus_add_watch(ms->bus, bus_call, ms);
-	ms->src = NULL;
-	ms->depay = NULL;
-	ms->decoder = NULL;
-	ms->videobox = NULL;
-	ms->txt_overlay = NULL;
-	ms->sink = NULL;
+static void moncell_init(struct moncell *mc, uint32_t idx) {
+	snprintf(mc->name, 8, "m%d", idx);
+	memset(mc->mid, 0, 8);
+	mc->widget = gtk_drawing_area_new();
+	mc->handle = 0;
+	mc->pipeline = gst_pipeline_new(mc->name);
+	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
+	gst_bus_add_watch(mc->bus, bus_call, mc);
+	mc->src = NULL;
+	mc->depay = NULL;
+	mc->decoder = NULL;
+	mc->videobox = NULL;
+	mc->txt_overlay = NULL;
+	mc->sink = NULL;
 }
 
 static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
-	struct monsink *ms = (struct monsink *) data;
-	GstPad *spad = gst_element_get_static_pad(ms->depay, "sink");
+	struct moncell *mc = (struct moncell *) data;
+	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
 	gst_pad_link(pad, spad);
 	gst_object_unref(spad);
 }
@@ -112,70 +112,70 @@ static GstElement *make_src(const char *loc) {
 	return src;
 }
 
-static void monsink_start_pipeline(struct monsink *ms, const char *loc,
+static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
-	ms->src = make_src(loc);
+	mc->src = make_src(loc);
 	if (memcmp(stype, "H264", 4) == 0) {
-		ms->depay = gst_element_factory_make("rtph264depay", NULL);
-		ms->decoder = gst_element_factory_make("avdec_h264", NULL);
+		mc->depay = gst_element_factory_make("rtph264depay", NULL);
+		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
 	} else {
-		ms->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
-		ms->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
+		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
+		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
-//	ms->videobox = make_videobox();
-	ms->txt_overlay = make_txt_overlay(desc);
-	ms->sink = gst_element_factory_make("xvimagesink", NULL);
-	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(ms->sink);
-	gst_video_overlay_set_window_handle(overlay, ms->handle);
+//	mc->videobox = make_videobox();
+	mc->txt_overlay = make_txt_overlay(desc);
+	mc->sink = gst_element_factory_make("xvimagesink", NULL);
+	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(mc->sink);
+	gst_video_overlay_set_window_handle(overlay, mc->handle);
 
-	gst_bin_add_many(GST_BIN(ms->pipeline), ms->src, ms->depay, ms->decoder,
-		ms->txt_overlay, ms->sink, NULL);
-	g_signal_connect(ms->src, "pad-added", G_CALLBACK(on_source_pad_added),
-		ms);
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
+		mc->txt_overlay, mc->sink, NULL);
+	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
+		mc);
 
-	gst_element_link(ms->src, ms->depay);
-	gst_element_link(ms->depay, ms->decoder);
-	gst_element_link(ms->decoder, ms->txt_overlay);
-//	gst_element_link(ms->decoder, ms->videobox);
-//	gst_element_link(ms->videobox, ms->txt_overlay);
-	gst_element_link(ms->txt_overlay, ms->sink);
+	gst_element_link(mc->src, mc->depay);
+	gst_element_link(mc->depay, mc->decoder);
+	gst_element_link(mc->decoder, mc->txt_overlay);
+//	gst_element_link(mc->decoder, mc->videobox);
+//	gst_element_link(mc->videobox, mc->txt_overlay);
+	gst_element_link(mc->txt_overlay, mc->sink);
 
-	gst_element_set_state(ms->pipeline, GST_STATE_PLAYING);
+	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static void monsink_stop_pipeline(struct monsink *ms) {
-	gst_element_set_state(ms->pipeline, GST_STATE_NULL);
-	gst_bin_remove(GST_BIN(ms->pipeline), ms->src);
-	gst_bin_remove(GST_BIN(ms->pipeline), ms->depay);
-	gst_bin_remove(GST_BIN(ms->pipeline), ms->decoder);
-//	gst_bin_remove(GST_BIN(ms->pipeline), ms->videobox);
-	gst_bin_remove(GST_BIN(ms->pipeline), ms->txt_overlay);
-	gst_bin_remove(GST_BIN(ms->pipeline), ms->sink);
+static void moncell_stop_pipeline(struct moncell *mc) {
+	gst_element_set_state(mc->pipeline, GST_STATE_NULL);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->src);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->depay);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->decoder);
+//	gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->txt_overlay);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->sink);
 }
 
-static void monsink_set_handle(struct monsink *ms) {
-	ms->handle = GDK_WINDOW_XID(gtk_widget_get_window(ms->widget));
+static void moncell_set_handle(struct moncell *mc) {
+	mc->handle = GDK_WINDOW_XID(gtk_widget_get_window(mc->widget));
 }
 
-static int32_t monsink_play_stream(struct monsink *ms, const char *loc,
+static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
-	if (ms->src)
-		monsink_stop_pipeline(ms);
-	monsink_start_pipeline(ms, loc, desc, stype);
+	if (mc->src)
+		moncell_stop_pipeline(mc);
+	moncell_start_pipeline(mc, loc, desc, stype);
 	return 1;
 }
 
-static void monsink_set_id(struct monsink *ms, const char *mid) {
-	strncpy(ms->mid, mid, 8);
+static void moncell_set_id(struct moncell *mc, const char *mid) {
+	strncpy(mc->mid, mid, 8);
 }
 
 struct mongrid {
 	uint32_t	rows;
 	uint32_t	cols;
 	GtkWidget	*window;
-	struct monsink	*sinks;
+	struct moncell	*sinks;
 };
 
 static struct mongrid grid;
@@ -184,8 +184,8 @@ static void mongrid_set_handles(void) {
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
-			struct monsink *ms = grid.sinks + i;
-			monsink_set_handle(ms);
+			struct moncell *mc = grid.sinks + i;
+			moncell_set_handle(mc);
 		}
 	}
 }
@@ -224,7 +224,7 @@ int32_t mongrid_init(uint32_t num) {
 	grid.rows = get_rows(num);
 	grid.cols = get_cols(num);
 	num = grid.rows * grid.cols;
-	grid.sinks = calloc(num, sizeof(struct monsink));
+	grid.sinks = calloc(num, sizeof(struct moncell));
 	gst_init(NULL, NULL);
 	gtk_init(NULL, NULL);
 	window = gtk_window_new(0);
@@ -237,9 +237,9 @@ int32_t mongrid_init(uint32_t num) {
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
-			struct monsink *ms = grid.sinks + i;
-			monsink_init(ms, i);
-			gtk_grid_attach(gtk_grid, ms->widget, c, r, 1, 1);
+			struct moncell *mc = grid.sinks + i;
+			moncell_init(mc, i);
+			gtk_grid_attach(gtk_grid, mc->widget, c, r, 1, 1);
 		}
 	}
 	gtk_container_add(GTK_CONTAINER(window), (GtkWidget *) gtk_grid);
@@ -253,8 +253,8 @@ int32_t mongrid_init(uint32_t num) {
 
 void mongrid_set_id(uint32_t idx, const char *mid) {
 	if (idx < grid.rows * grid.cols) {
-		struct monsink *ms = grid.sinks + idx;
-		return monsink_set_id(ms, mid);
+		struct moncell *mc = grid.sinks + idx;
+		return moncell_set_id(mc, mid);
 	}
 }
 
@@ -262,8 +262,8 @@ int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype)
 {
 	if (idx < grid.rows * grid.cols) {
-		struct monsink *ms = grid.sinks + idx;
-		return monsink_play_stream(ms, loc, desc, stype);
+		struct moncell *mc = grid.sinks + idx;
+		return moncell_play_stream(mc, loc, desc, stype);
 	} else
 		return 1;
 }
