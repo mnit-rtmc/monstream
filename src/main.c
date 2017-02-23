@@ -19,24 +19,17 @@
 #include <stdlib.h>
 
 uint32_t load_config(void);
-void load_command(const char *fname);
 void *command_thread(void *data);
 int32_t mongrid_init(uint32_t num);
 
 int main(void) {
 	pthread_t thread;
 	uint32_t mon = load_config();
-	uint32_t i;
 	int rc;
 
 	if (mongrid_init(mon))
 		return -1;
-	for (i = 0; i < mon; i++) {
-		char fname[16];
-		sprintf(fname, "play.%d", i);
-		load_command(fname);
-	}
-	rc = pthread_create(&thread, NULL, command_thread, NULL);
+	rc = pthread_create(&thread, NULL, command_thread, &mon);
 	if (rc) {
 		fprintf(stderr, "pthread_create error: %d\n", rc);
 		return 1;

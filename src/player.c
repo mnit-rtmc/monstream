@@ -212,9 +212,33 @@ static void process_commands(const char *buf, size_t n) {
 	}
 }
 
+static void load_command(const char *fname) {
+	char buf[128];
+	ssize_t n = config_load(fname, buf, 128);
+	if (n < 0)
+		return;
+	const char *end = buf + n;
+	process_command(buf, end);
+}
+
+static void load_commands(uint32_t mon) {
+	int i;
+	for (i = 0; i < mon; i++) {
+		char fname[16];
+		sprintf(fname, "monitor.%d", i);
+		load_command(fname);
+		sprintf(fname, "play.%d", i);
+		load_command(fname);
+	}
+}
+
 void *command_thread(void *data) {
+	uint32_t *mon = data;
 	char buf[1024];
-	int fd = open_bind("7001");
+	int fd;
+
+	load_commands(*mon);
+	fd = open_bind("7001");
 	if (fd < 0)
 		goto out;
 	while (true) {
@@ -246,13 +270,4 @@ uint32_t load_config(void) {
 		fprintf(stderr, "Invalid command: %s\n", buf);
 		return 1;
 	}
-}
-
-void load_command(const char *fname) {
-	char buf[128];
-	ssize_t n = config_load(fname, buf, 128);
-	if (n < 0)
-		return;
-	const char *end = buf + n;
-	process_command(buf, end);
 }
