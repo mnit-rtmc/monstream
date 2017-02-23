@@ -130,7 +130,7 @@ static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
 	gst_object_unref(spad);
 }
 
-static void moncell_start_test(struct moncell *mc) {
+static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_test_src();
 	mc->videobox = make_videobox();
 	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
@@ -151,6 +151,8 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		fprintf(stderr, "End of stream\n");
+		moncell_stop_pipeline(mc);
+		moncell_start_blank(mc);
 		break;
 	case GST_MESSAGE_ERROR: {
 		gchar *debug;
@@ -160,7 +162,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 		fprintf(stderr, "GST Error: %s\n", error->message);
 		g_error_free(error);
 		moncell_stop_pipeline(mc);
-		moncell_start_test(mc);
+		moncell_start_blank(mc);
 		break;
 	}
 	default:
