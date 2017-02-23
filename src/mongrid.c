@@ -40,14 +40,14 @@ struct moncell {
 
 static const uint32_t GST_VIDEO_TEST_SRC_BALL = 18;
 
-static GstElement *make_test_src(void) {
+static GstElement *make_src_blank(void) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
 	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BALL, NULL);
 	g_object_set(G_OBJECT(src), "foreground-color", 0x408020, NULL);
 	return src;
 }
 
-static GstElement *make_src(const char *loc) {
+static GstElement *make_src_rtsp(const char *loc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", loc, NULL);
 	g_object_set(G_OBJECT(src), "latency", 2, NULL);
@@ -123,15 +123,8 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->sink = NULL;
 }
 
-static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
-	struct moncell *mc = (struct moncell *) data;
-	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
-	gst_pad_link(pad, spad);
-	gst_object_unref(spad);
-}
-
 static void moncell_start_blank(struct moncell *mc) {
-	mc->src = make_test_src();
+	mc->src = make_src_blank();
 	mc->videobox = make_videobox();
 	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
 	mc->sink = make_sink(mc);
@@ -142,6 +135,44 @@ static void moncell_start_blank(struct moncell *mc) {
 	gst_element_link(mc->src, mc->videobox);
 	gst_element_link(mc->videobox, mc->mon_overlay);
 	gst_element_link(mc->mon_overlay, mc->sink);
+
+	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
+}
+
+static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
+	gst_pad_link(pad, spad);
+	gst_object_unref(spad);
+}
+
+static void moncell_start_pipeline(struct moncell *mc, const char *loc,
+	const char *desc, const char *stype)
+{
+	mc->src = make_src_rtsp(loc);
+	if (memcmp(stype, "H264", 4) == 0) {
+		mc->depay = gst_element_factory_make("rtph264depay", NULL);
+		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
+	} else {
+		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
+		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
+	}
+	mc->videobox = make_videobox();
+	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
+	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_BOTTOM);
+	mc->sink = make_sink(mc);
+
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
+		mc->videobox, mc->mon_overlay, mc->txt_overlay, mc->sink, NULL);
+	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
+		mc);
+
+	gst_element_link(mc->src, mc->depay);
+	gst_element_link(mc->depay, mc->decoder);
+	gst_element_link(mc->decoder, mc->videobox);
+	gst_element_link(mc->videobox, mc->mon_overlay);
+	gst_element_link(mc->mon_overlay, mc->txt_overlay);
+	gst_element_link(mc->txt_overlay, mc->sink);
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -186,37 +217,6 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->mon_overlay = NULL;
 	mc->txt_overlay = NULL;
 	mc->sink = NULL;
-}
-
-static void moncell_start_pipeline(struct moncell *mc, const char *loc,
-	const char *desc, const char *stype)
-{
-	mc->src = make_src(loc);
-	if (memcmp(stype, "H264", 4) == 0) {
-		mc->depay = gst_element_factory_make("rtph264depay", NULL);
-		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
-	} else {
-		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
-		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
-	}
-	mc->videobox = make_videobox();
-	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
-	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_BOTTOM);
-	mc->sink = make_sink(mc);
-
-	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->videobox, mc->mon_overlay, mc->txt_overlay, mc->sink, NULL);
-	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
-		mc);
-
-	gst_element_link(mc->src, mc->depay);
-	gst_element_link(mc->depay, mc->decoder);
-	gst_element_link(mc->decoder, mc->videobox);
-	gst_element_link(mc->videobox, mc->mon_overlay);
-	gst_element_link(mc->mon_overlay, mc->txt_overlay);
-	gst_element_link(mc->txt_overlay, mc->sink);
-
-	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
 static void moncell_set_handle(struct moncell *mc) {
