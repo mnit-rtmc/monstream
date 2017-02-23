@@ -62,7 +62,7 @@ static GstElement *make_txt_overlay(const char *desc, enum align a,
 	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
 	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 14", NULL);
 	g_object_set(G_OBJECT(ovl), "shaded-background", TRUE, NULL);
-	g_object_set(G_OBJECT(ovl), "shading-value", 192, NULL);
+	g_object_set(G_OBJECT(ovl), "shading-value", 224, NULL);
 	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
 	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
 	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
@@ -125,6 +125,12 @@ static GstElement *make_src(const char *loc) {
 	return src;
 }
 
+static GstElement *make_sink(void) {
+	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
+	g_object_set(G_OBJECT(sink), "force-aspect-ratio", FALSE, NULL);
+	return sink;
+}
+
 static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
@@ -137,9 +143,9 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
 	mc->videobox = make_videobox();
-	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
+	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_TOP);
 	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_TOP);
-	mc->sink = gst_element_factory_make("xvimagesink", NULL);
+	mc->sink = make_sink();
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(mc->sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
 
