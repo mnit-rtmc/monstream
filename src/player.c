@@ -143,8 +143,6 @@ static void process_play(const char *buf, const char *end) {
 		d = nstr_cat(d, dend, " --- ");
 		d = nstr_cpy(d, dend, p6, end);
 	}
-//	d = nstr_cat(d, dend, "\n");
-//	d = nstr_cpy(d, dend, p5, end);
 	nstr_end(d, dend);
 	u = nstr_cpy(uri, uend, p4, end);
 	nstr_end(u, uend);
@@ -156,6 +154,7 @@ static void process_play(const char *buf, const char *end) {
 }
 
 static void process_stop(const char *buf, const char *end) {
+	// FIXME
 	printf("stop!\n");
 }
 
