@@ -37,13 +37,11 @@ struct moncell {
 	GstElement	*sink;
 };
 
-#if 0
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
-	g_object_set(G_OBJECT(vbx), "left", -142, NULL);
+//	g_object_set(G_OBJECT(vbx), "left", -142, NULL);
 	return vbx;
 }
-#endif
 
 static GstElement *make_txt_overlay(const char *desc) {
 	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
@@ -70,7 +68,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 		GError *error;
 		gst_message_parse_error(msg, &error, &debug);
 		g_free(debug);
-		fprintf(stderr, "Error: %s\n", error->message);
+		fprintf(stderr, "GST Error: %s\n", error->message);
 		g_error_free(error);
 		break;
 	}
@@ -123,22 +121,21 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
-//	mc->videobox = make_videobox();
+	mc->videobox = make_videobox();
 	mc->txt_overlay = make_txt_overlay(desc);
 	mc->sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(mc->sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->txt_overlay, mc->sink, NULL);
+		mc->videobox, mc->txt_overlay, mc->sink, NULL);
 	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
 		mc);
 
 	gst_element_link(mc->src, mc->depay);
 	gst_element_link(mc->depay, mc->decoder);
-	gst_element_link(mc->decoder, mc->txt_overlay);
-//	gst_element_link(mc->decoder, mc->videobox);
-//	gst_element_link(mc->videobox, mc->txt_overlay);
+	gst_element_link(mc->decoder, mc->videobox);
+	gst_element_link(mc->videobox, mc->txt_overlay);
 	gst_element_link(mc->txt_overlay, mc->sink);
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
@@ -149,9 +146,15 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->src);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->depay);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->decoder);
-//	gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->txt_overlay);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->sink);
+	mc->src = NULL;
+	mc->depay = NULL;
+	mc->decoder = NULL;
+	mc->videobox = NULL;
+	mc->txt_overlay = NULL;
+	mc->sink = NULL;
 }
 
 static void moncell_set_handle(struct moncell *mc) {
