@@ -50,7 +50,7 @@ ssize_t config_store(const char *name, const char *buf, size_t n) {
 
 	if (snprintf(path, sizeof(path), PATH, name) < 0)
 		return -1;
-	fd = open(path, O_WRONLY | O_CREAT, mode);
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if (fd >= 0) {
 		ssize_t n_bytes = write(fd, buf, n);
 		if (n_bytes < 0) {
