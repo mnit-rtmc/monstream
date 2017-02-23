@@ -58,7 +58,10 @@ static GstElement *make_src_rtsp(const char *loc) {
 
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
+	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "bottom", -40, NULL);
+	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
+	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
 }
 
