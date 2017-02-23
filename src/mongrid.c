@@ -33,6 +33,7 @@ struct moncell {
 	GstElement	*depay;
 	GstElement	*decoder;
 	GstElement	*videobox;
+	GstElement	*mon_overlay;
 	GstElement	*txt_overlay;
 	GstElement	*sink;
 };
@@ -43,15 +44,28 @@ static GstElement *make_videobox(void) {
 	return vbx;
 }
 
-static GstElement *make_txt_overlay(const char *desc) {
+enum align {
+	ALIGN_LEFT,
+	ALIGN_CENTER,
+	ALIGN_RIGHT,
+};
+enum valign {
+	VALIGN_BASELINE,
+	VALIGN_BOTTOM,
+	VALIGN_TOP,
+};
+
+static GstElement *make_txt_overlay(const char *desc, enum align a,
+	enum valign va)
+{
 	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
 	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
 	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 14", NULL);
 	g_object_set(G_OBJECT(ovl), "shaded-background", TRUE, NULL);
 	g_object_set(G_OBJECT(ovl), "shading-value", 192, NULL);
-	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFA0, NULL);
-	g_object_set(G_OBJECT(ovl), "halignment", 2, NULL); // right
-	g_object_set(G_OBJECT(ovl), "valignment", 2, NULL); // top
+	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
+	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
+	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
 	g_object_set(G_OBJECT(ovl), "wrap-mode", -1, NULL); // no wrapping
 	g_object_set(G_OBJECT(ovl), "xpad", 0, NULL);
 	g_object_set(G_OBJECT(ovl), "ypad", 0, NULL);
@@ -90,6 +104,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->videobox = NULL;
+	mc->mon_overlay = NULL;
 	mc->txt_overlay = NULL;
 	mc->sink = NULL;
 }
@@ -122,20 +137,22 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
 	mc->videobox = make_videobox();
-	mc->txt_overlay = make_txt_overlay(desc);
+	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
+	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_TOP);
 	mc->sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(mc->sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->videobox, mc->txt_overlay, mc->sink, NULL);
+		mc->videobox, mc->mon_overlay, mc->txt_overlay, mc->sink, NULL);
 	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
 		mc);
 
 	gst_element_link(mc->src, mc->depay);
 	gst_element_link(mc->depay, mc->decoder);
 	gst_element_link(mc->decoder, mc->videobox);
-	gst_element_link(mc->videobox, mc->txt_overlay);
+	gst_element_link(mc->videobox, mc->mon_overlay);
+	gst_element_link(mc->mon_overlay, mc->txt_overlay);
 	gst_element_link(mc->txt_overlay, mc->sink);
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
@@ -147,12 +164,14 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->depay);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->decoder);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
+	gst_bin_remove(GST_BIN(mc->pipeline), mc->mon_overlay);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->txt_overlay);
 	gst_bin_remove(GST_BIN(mc->pipeline), mc->sink);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->videobox = NULL;
+	mc->mon_overlay = NULL;
 	mc->txt_overlay = NULL;
 	mc->sink = NULL;
 }

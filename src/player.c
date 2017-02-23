@@ -168,6 +168,7 @@ static void process_monitor(const char *buf, const char *end) {
 	char fname[16];
 	char *m = nstr_cpy(mid, mend, p3, end);
 	nstr_end(m, mend);
+	mongrid_set_id(mon, mid);
 	sprintf(fname, "monitor.%d", mon);
 	config_store(fname, buf, (end - buf));
 }
