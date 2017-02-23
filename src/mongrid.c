@@ -279,6 +279,8 @@ static uint32_t get_cols(uint32_t num) {
 int32_t mongrid_init(uint32_t num) {
 	GtkWidget *window;
 	GtkGrid *gtk_grid;
+	GdkDisplay *display;
+	GdkCursor *cursor;
 	if (num > 16) {
 		grid.rows = 0;
 		grid.cols = 0;
@@ -311,6 +313,9 @@ int32_t mongrid_init(uint32_t num) {
 	gtk_window_fullscreen((GtkWindow *) window);
 	gtk_widget_show_all(window);
 	gtk_widget_realize(window);
+	display = gtk_widget_get_display(window);
+	cursor = gdk_cursor_new_for_display(display, GDK_BLANK_CURSOR);
+	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
 	mongrid_set_handles();
 	return 0;
 }
