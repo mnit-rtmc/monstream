@@ -38,11 +38,11 @@ struct moncell {
 	GstElement	*sink;
 };
 
-static const uint32_t GST_VIDEO_TEST_SRC_BALL = 18;
+static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
 static GstElement *make_src_blank(void) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
-	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BALL, NULL);
+	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BLACK, NULL);
 	g_object_set(G_OBJECT(src), "foreground-color", 0x408020, NULL);
 	return src;
 }
