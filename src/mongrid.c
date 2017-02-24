@@ -102,9 +102,9 @@ static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
 		return;
 
 	int top = mc->height - 38;
-	int bottom = mc->height - 4;
-	int left = 4;
-	int right = mc->width - 4;
+	int bottom = mc->height - 2;
+	int left = 2;
+	int right = mc->width - 2;
 	cairo_move_to(cr, left, top);
 	cairo_line_to(cr, right, top);
 	cairo_line_to(cr, right, bottom);
