@@ -21,6 +21,7 @@
 uint32_t load_config(void);
 void *command_thread(void *data);
 int32_t mongrid_init(uint32_t num);
+void cairoplugin_register_static(void);
 
 int main(void) {
 	pthread_t thread;
@@ -29,6 +30,7 @@ int main(void) {
 
 	if (mongrid_init(mon))
 		return -1;
+	cairoplugin_register_static();
 	rc = pthread_create(&thread, NULL, command_thread, &mon);
 	if (rc) {
 		fprintf(stderr, "pthread_create error: %d\n", rc);

@@ -19,6 +19,7 @@
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 #include <gst/gst.h>
+#include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 
@@ -27,14 +28,19 @@ struct moncell {
 	char		mid[8];
 	GtkWidget	*widget;
 	guintptr	handle;
+	int		width;
+	int		height;
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*src;
 	GstElement	*depay;
 	GstElement	*decoder;
 	GstElement	*videobox;
+	GstElement	*convert0;
+	GstElement	*draw_overlay;
 	GstElement	*mon_overlay;
 	GstElement	*txt_overlay;
+	GstElement	*convert1;
 	GstElement	*sink;
 };
 
@@ -71,6 +77,47 @@ static GstElement *make_videobox(void) {
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
+}
+
+static GstElement *make_convert(void) {
+	return gst_element_factory_make("videoconvert", NULL);
+}
+
+static void prepare_draw_cb(GstElement *ovl, GstCaps *caps, gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	GstVideoInfo info;
+
+	if (gst_video_info_from_caps(&info, caps)) {
+		mc->width = info.width;
+		mc->height = info.height;
+	}
+}
+
+static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
+	guint64 duration, gpointer data)
+{
+	struct moncell *mc = (struct moncell *) data;
+
+	if (mc->width <= 0 || mc->height <= 0)
+		return;
+
+	int top = mc->height - 38;
+	int bottom = mc->height - 4;
+	int left = 4;
+	int right = mc->width - 4;
+	cairo_move_to(cr, left, top);
+	cairo_line_to(cr, right, top);
+	cairo_line_to(cr, right, bottom);
+	cairo_line_to(cr, left, bottom);
+	cairo_set_source_rgba(cr, 0.0, 0.2, 0.0, 1.0);
+	cairo_fill(cr);
+}
+
+static GstElement *make_draw(struct moncell *mc) {
+	GstElement *ovl = gst_element_factory_make("cairooverlay", NULL);
+	g_signal_connect(ovl, "caps-changed", G_CALLBACK(prepare_draw_cb), mc);
+	g_signal_connect(ovl, "draw", G_CALLBACK(do_draw_cb), mc);
+	return ovl;
 }
 
 enum align {
@@ -119,33 +166,51 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 		gst_bin_remove(GST_BIN(mc->pipeline), mc->decoder);
 	if (mc->videobox)
 		gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
+	if (mc->convert0)
+		gst_bin_remove(GST_BIN(mc->pipeline), mc->convert0);
+	if (mc->draw_overlay)
+		gst_bin_remove(GST_BIN(mc->pipeline), mc->draw_overlay);
 	if (mc->mon_overlay)
 		gst_bin_remove(GST_BIN(mc->pipeline), mc->mon_overlay);
 	if (mc->txt_overlay)
 		gst_bin_remove(GST_BIN(mc->pipeline), mc->txt_overlay);
+	if (mc->convert1)
+		gst_bin_remove(GST_BIN(mc->pipeline), mc->convert1);
 	if (mc->sink)
 		gst_bin_remove(GST_BIN(mc->pipeline), mc->sink);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->videobox = NULL;
+	mc->convert0 = NULL;
+	mc->draw_overlay = NULL;
 	mc->mon_overlay = NULL;
 	mc->txt_overlay = NULL;
+	mc->convert1 = NULL;
 	mc->sink = NULL;
+	mc->width = 0;
+	mc->height = 0;
 }
 
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
 	mc->videobox = make_videobox();
+	mc->convert0 = make_convert();
+	mc->draw_overlay = make_draw(mc);
 	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
+	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->videobox,
-		mc->mon_overlay, mc->sink, NULL);
+		mc->convert0, mc->draw_overlay, mc->mon_overlay, mc->convert1,
+		mc->sink, NULL);
 
 	gst_element_link(mc->src, mc->videobox);
-	gst_element_link(mc->videobox, mc->mon_overlay);
-	gst_element_link(mc->mon_overlay, mc->sink);
+	gst_element_link(mc->videobox, mc->convert0);
+	gst_element_link(mc->convert0, mc->draw_overlay);
+	gst_element_link(mc->draw_overlay, mc->mon_overlay);
+	gst_element_link(mc->mon_overlay, mc->convert1);
+	gst_element_link(mc->convert1, mc->sink);
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -162,19 +227,22 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
 	mc->videobox = make_videobox();
+	mc->convert0 = make_convert();
+	mc->draw_overlay = make_draw(mc);
 	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
 	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_BOTTOM);
+	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->videobox, mc->mon_overlay, mc->txt_overlay, mc->sink, NULL);
+		mc->videobox, mc->convert0, mc->draw_overlay, mc->mon_overlay,
+		mc->txt_overlay, mc->convert1, mc->sink, NULL);
 
-	gst_element_link(mc->src, mc->depay);
-	gst_element_link(mc->depay, mc->decoder);
-	gst_element_link(mc->decoder, mc->videobox);
-	gst_element_link(mc->videobox, mc->mon_overlay);
-	gst_element_link(mc->mon_overlay, mc->txt_overlay);
-	gst_element_link(mc->txt_overlay, mc->sink);
+	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
+	                           mc->convert0, mc->draw_overlay,
+	                           mc->mon_overlay, mc->txt_overlay,
+	                           mc->convert1, mc->sink, NULL))
+		fprintf(stderr, "Unable to link elements\n");
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -209,6 +277,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	memset(mc->mid, 0, 8);
 	mc->widget = gtk_drawing_area_new();
 	mc->handle = 0;
+	mc->width = 0;
+	mc->height = 0;
 	mc->pipeline = gst_pipeline_new(mc->name);
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
 	gst_bus_add_watch(mc->bus, bus_cb, mc);
@@ -216,8 +286,11 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->videobox = NULL;
+	mc->convert0 = NULL;
+	mc->draw_overlay = NULL;
 	mc->mon_overlay = NULL;
 	mc->txt_overlay = NULL;
+	mc->convert1 = NULL;
 	mc->sink = NULL;
 }
 
