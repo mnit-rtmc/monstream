@@ -47,12 +47,20 @@ static GstElement *make_src_blank(void) {
 	return src;
 }
 
-static GstElement *make_src_rtsp(const char *loc) {
+static void source_pad_added_cb(GstElement *src, GstPad *pad, gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
+	gst_pad_link(pad, spad);
+	gst_object_unref(spad);
+}
+
+static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", loc, NULL);
 	g_object_set(G_OBJECT(src), "latency", 2, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
+	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
 	return src;
 }
 
@@ -142,17 +150,10 @@ static void moncell_start_blank(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static void on_source_pad_added(GstElement *src, GstPad *pad, gpointer data) {
-	struct moncell *mc = (struct moncell *) data;
-	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
-	gst_pad_link(pad, spad);
-	gst_object_unref(spad);
-}
-
 static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
-	mc->src = make_src_rtsp(loc);
+	mc->src = make_src_rtsp(mc, loc);
 	if (memcmp(stype, "H264", 4) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
@@ -167,8 +168,6 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->mon_overlay, mc->txt_overlay, mc->sink, NULL);
-	g_signal_connect(mc->src, "pad-added", G_CALLBACK(on_source_pad_added),
-		mc);
 
 	gst_element_link(mc->src, mc->depay);
 	gst_element_link(mc->depay, mc->decoder);
@@ -180,7 +179,7 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
+static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
@@ -212,7 +211,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->handle = 0;
 	mc->pipeline = gst_pipeline_new(mc->name);
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
-	gst_bus_add_watch(mc->bus, bus_call, mc);
+	gst_bus_add_watch(mc->bus, bus_cb, mc);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
