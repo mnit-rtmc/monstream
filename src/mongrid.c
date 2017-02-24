@@ -204,14 +204,11 @@ static void moncell_start_blank(struct moncell *mc) {
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->videobox,
 		mc->convert0, mc->draw_overlay, mc->mon_overlay, mc->convert1,
 		mc->sink, NULL);
-
-	gst_element_link(mc->src, mc->videobox);
-	gst_element_link(mc->videobox, mc->convert0);
-	gst_element_link(mc->convert0, mc->draw_overlay);
-	gst_element_link(mc->draw_overlay, mc->mon_overlay);
-	gst_element_link(mc->mon_overlay, mc->convert1);
-	gst_element_link(mc->convert1, mc->sink);
-
+	if (!gst_element_link_many(mc->src, mc->videobox,
+	                           mc->convert0, mc->draw_overlay,
+	                           mc->mon_overlay, mc->convert1, mc->sink,
+	                           NULL))
+		fprintf(stderr, "Unable to link elements\n");
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
@@ -237,13 +234,11 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->convert0, mc->draw_overlay, mc->mon_overlay,
 		mc->txt_overlay, mc->convert1, mc->sink, NULL);
-
 	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
 	                           mc->convert0, mc->draw_overlay,
 	                           mc->mon_overlay, mc->txt_overlay,
 	                           mc->convert1, mc->sink, NULL))
 		fprintf(stderr, "Unable to link elements\n");
-
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
