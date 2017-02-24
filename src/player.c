@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>		/* for memset */
 
-void mongrid_set_id(uint32_t idx, const char *mid);
+void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
@@ -158,16 +158,48 @@ static void process_stop(const char *buf, const char *end) {
 	printf("stop!\n");
 }
 
+static int32_t parse_digit(char d) {
+	if (d >= '0' && d <= '9')
+		return d - '0';
+	else if (d >= 'A' && d <= 'Z')
+		return d - 'A';
+	else if (d >= 'a' && d <= 'z')
+		return d - 'a';
+	else
+		return -1;
+}
+
+static int32_t parse_hex(const char *hex) {
+	uint32_t v = 0;
+	int i;
+	for (i = 0; i < 6; i++) {
+		if (hex[i] == '\0')
+			break;
+		int32_t d = parse_digit(hex[i]);
+		if (d < 0)
+			return -1;
+		v <<= 4;
+		v |= d;
+	}
+	return v;
+}
+
 static void process_monitor(const char *buf, const char *end) {
 	const char *p2 = param_next(buf, end);	// mon index
 	const char *p3 = param_next(p2, end);	// monitor ID
+	const char *p4 = param_next(p3, end);	// accent color
 	int mon = parse_uint(p2, end);
 	char mid[8];
 	const char *mend = mid + 8;
+	char accent[8];
+	const char *aend = accent + 8;
 	char fname[16];
 	char *m = nstr_cpy(mid, mend, p3, end);
 	nstr_end(m, mend);
-	mongrid_set_id(mon, mid);
+	char *a = nstr_cpy(accent, aend, p4, end);
+	nstr_end(a, aend);
+	int32_t acc = parse_hex(accent);
+	mongrid_set_id(mon, mid, acc);
 	sprintf(fname, "monitor.%d", mon);
 	config_store(fname, buf, (end - buf));
 }

@@ -26,6 +26,9 @@
 struct moncell {
 	char		name[8];
 	char		mid[8];
+	double		acc_red;
+	double		acc_green;
+	double		acc_blue;
 	GtkWidget	*widget;
 	guintptr	handle;
 	int		width;
@@ -105,11 +108,12 @@ static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
 	int bottom = mc->height - 2;
 	int left = 2;
 	int right = mc->width - 2;
+
 	cairo_move_to(cr, left, top);
 	cairo_line_to(cr, right, top);
 	cairo_line_to(cr, right, bottom);
 	cairo_line_to(cr, left, bottom);
-	cairo_set_source_rgba(cr, 0.0, 0.2, 0.0, 1.0);
+	cairo_set_source_rgba(cr, mc->acc_red, mc->acc_green, mc->acc_blue, 1);
 	cairo_fill(cr);
 }
 
@@ -270,6 +274,9 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 static void moncell_init(struct moncell *mc, uint32_t idx) {
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, 8);
+	mc->acc_red = 0.0;
+	mc->acc_green = 0.2;
+	mc->acc_blue = 0.0;
 	mc->widget = gtk_drawing_area_new();
 	mc->handle = 0;
 	mc->width = 0;
@@ -301,8 +308,13 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	return 1;
 }
 
-static void moncell_set_id(struct moncell *mc, const char *mid) {
+static void moncell_set_id(struct moncell *mc, const char *mid,
+	uint32_t accent)
+{
 	strncpy(mc->mid, mid, 8);
+	mc->acc_red   = ((accent >> 16) & 0xFF) / 256.0;
+	mc->acc_green = ((accent >>  8) & 0xFF) / 256.0;
+	mc->acc_blue  = ((accent >>  0) & 0xFF) / 256.0;
 }
 
 struct mongrid {
@@ -390,10 +402,10 @@ int32_t mongrid_init(uint32_t num) {
 	return 0;
 }
 
-void mongrid_set_id(uint32_t idx, const char *mid) {
+void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent) {
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		return moncell_set_id(mc, mid);
+		return moncell_set_id(mc, mid, accent);
 	}
 }
 
