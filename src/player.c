@@ -153,11 +153,6 @@ static void process_play(const char *buf, const char *end) {
 	config_store(fname, buf, (end - buf));
 }
 
-static void process_stop(const char *buf, const char *end) {
-	// FIXME
-	printf("stop!\n");
-}
-
 static int32_t parse_digit(char d) {
 	if (d >= '0' && d <= '9')
 		return d - '0';
@@ -213,8 +208,6 @@ static void process_command(const char *buf, const char *end) {
 	const char *pe = param_end(buf, end);
 	if (param_check("play", buf, pe))
 		process_play(buf, end);
-	else if (param_check("stop", buf, pe))
-		process_stop(buf, end);
 	else if (param_check("monitor", buf, pe))
 		process_monitor(buf, end);
 	else if (param_check("config", buf, pe))
