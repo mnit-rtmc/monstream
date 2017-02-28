@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <gtk/gtk.h>
 #include <netdb.h>		/* for socket stuff */
@@ -21,13 +22,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>		/* for memset */
+#include "nstr.h"
 
 void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
-ssize_t config_load(const char *name, char *buf, size_t n);
-ssize_t config_store(const char *name, const char *buf, size_t n);
+nstr_t config_load(const char *name, nstr_t str);
+ssize_t config_store(const char *name, nstr_t cmd);
 
 int open_bind(const char *service) {
 	struct addrinfo hints;
@@ -60,189 +62,83 @@ int open_bind(const char *service) {
 	return -1;
 }
 
-static const char *param_end(const char *buf, const char *end) {
-	const char *b = buf;
-	while (b < end) {
-		if ('\x1F' == *b || '\x1E' == *b)
-			return b;
-		++b;
-	}
-	return end;
-}
-
-static const char *param_next(const char *buf, const char *end) {
-	const char *pe = param_end(buf, end);
-	return (pe < end) ? pe + 1 : end;
-}
-
-static bool param_check(const char *val, const char *buf, const char *pe) {
-	return memcmp(val, buf, pe - buf) == 0;
-}
-
-static char *nstr_cpy(char *dst, const char *dend, const char *src,
-	const char *send)
-{
-	const char *se = param_end(src, send);
-	size_t sn = se - src;
-	size_t dn = dend - dst;
-	size_t n = (sn < dn) ? sn : dn;
-	memcpy(dst, src, n);
-	return dst + n;
-}
-
-static char *nstr_cat(char *dst, const char *dend, const char *src) {
-	const char *s = src;
-	char *d = dst;
-	while (d < dend) {
-		if (0 == *s)
-			break;
-		*d = *s;
-		d++;
-		s++;
-	}
-	return d;
-}
-
-static void nstr_end(char *dst, const char *end) {
-	if (dst >= end) {
-		size_t n = 1 + (dst - end);
-		dst -= n;
-	}
-	*dst = '\0';
-}
-
-static int parse_uint(const char *p, const char *end) {
-	const char *pe = param_end(p, end);
-	char buf[32];
-	size_t n = pe - p;
-	if (n < 32) {
-		memcpy(buf, p, n);
-		buf[n] = '\0';
-		return atoi(buf);
+static void process_play(nstr_t cmd) {
+	nstr_t str = nstr_dup(cmd);
+	nstr_t p1 = nstr_split(&str, '\x1F');	// "play"
+	nstr_t p2 = nstr_split(&str, '\x1F');	// mon index
+	nstr_t p3 = nstr_split(&str, '\x1F');	// camera ID
+	nstr_t p4 = nstr_split(&str, '\x1F');	// stream URI
+	nstr_t p5 = nstr_split(&str, '\x1F');	// stream type
+	nstr_t p6 = nstr_split(&str, '\x1F');	// title
+	assert(nstr_cmp_z(p1, "play"));
+	int mon = nstr_parse_u32(p2);
+	if (mon >= 0) {
+		char desc[128];
+		char uri[128];
+		char stype[16];
+		char fname[16];
+		nstr_t d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
+		if (nstr_len(p6)) {
+			nstr_cat_z(&d, " --- ");
+			nstr_cat(&d, p6);
+		}
+		nstr_z(d);
+		nstr_wrap(uri, sizeof(uri), p4);
+		nstr_wrap(stype, sizeof(stype), p5);
+		mongrid_play_stream(mon, uri, desc, stype);
+		sprintf(fname, "play.%d", mon);
+		config_store(fname, cmd);
 	} else
-		return -1;
+		fprintf(stderr, "Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static void process_play(const char *buf, const char *end) {
-	const char *p2 = param_next(buf, end);	// mon index
-	const char *p3 = param_next(p2, end);	// camera ID
-	const char *p4 = param_next(p3, end);	// stream URI
-	const char *p5 = param_next(p4, end);	// stream type
-	const char *p6 = param_next(p5, end);	// title
-	int mon = parse_uint(p2, end);
-	char desc[128];
-	char uri[128];
-	char stype[16];
-	const char *dend = desc + 128;
-	const char *uend = uri + 128;
-	const char *tend = stype + 16;
-	char *u, *s;
-	char *d = nstr_cpy(desc, dend, p3, end);
-	char fname[16];
-	if (p6 < end) {
-		d = nstr_cat(d, dend, " --- ");
-		d = nstr_cpy(d, dend, p6, end);
-	}
-	nstr_end(d, dend);
-	u = nstr_cpy(uri, uend, p4, end);
-	nstr_end(u, uend);
-	s = nstr_cpy(stype, tend, p5, end);
-	nstr_end(s, tend);
-	mongrid_play_stream(mon, uri, desc, stype);
-	sprintf(fname, "play.%d", mon);
-	config_store(fname, buf, (end - buf));
+static void process_monitor(nstr_t cmd) {
+	nstr_t str = nstr_dup(cmd);
+	nstr_t p1 = nstr_split(&str, '\x1F');	// "monitor"
+	nstr_t p2 = nstr_split(&str, '\x1F');	// mon index
+	nstr_t p3 = nstr_split(&str, '\x1F');	// monitor ID
+	nstr_t p4 = nstr_split(&str, '\x1F');	// accent color
+	assert(nstr_cmp_z(p1, "monitor"));
+	int mon = nstr_parse_u32(p2);
+	if (mon >= 0) {
+		char mid[8];
+		char fname[16];
+		nstr_wrap(mid, sizeof(mid), p3);
+		int32_t acc = nstr_parse_hex(p4);
+		mongrid_set_id(mon, mid, acc);
+		sprintf(fname, "monitor.%d", mon);
+		config_store(fname, cmd);
+	} else
+		fprintf(stderr, "Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static int32_t parse_digit(char d) {
-	if (d >= '0' && d <= '9')
-		return d - '0';
-	else if (d >= 'A' && d <= 'Z')
-		return d - 'A';
-	else if (d >= 'a' && d <= 'z')
-		return d - 'a';
-	else
-		return -1;
-}
-
-static int32_t parse_hex(const char *hex) {
-	uint32_t v = 0;
-	int i;
-	for (i = 0; i < 6; i++) {
-		if (hex[i] == '\0')
-			break;
-		int32_t d = parse_digit(hex[i]);
-		if (d < 0)
-			return -1;
-		v <<= 4;
-		v |= d;
-	}
-	return v;
-}
-
-static void process_monitor(const char *buf, const char *end) {
-	const char *p2 = param_next(buf, end);	// mon index
-	const char *p3 = param_next(p2, end);	// monitor ID
-	const char *p4 = param_next(p3, end);	// accent color
-	int mon = parse_uint(p2, end);
-	char mid[8];
-	const char *mend = mid + 8;
-	char accent[8];
-	const char *aend = accent + 8;
-	char fname[16];
-	char *m = nstr_cpy(mid, mend, p3, end);
-	nstr_end(m, mend);
-	char *a = nstr_cpy(accent, aend, p4, end);
-	nstr_end(a, aend);
-	int32_t acc = parse_hex(accent);
-	mongrid_set_id(mon, mid, acc);
-	sprintf(fname, "monitor.%d", mon);
-	config_store(fname, buf, (end - buf));
-}
-
-static void process_config(const char *buf, const char *end) {
-	config_store("config", buf, (end - buf));
+static void process_config(nstr_t cmd) {
+	config_store("config", cmd);
 	exit(0);
 }
 
-static void process_command(const char *buf, const char *end) {
-	const char *pe = param_end(buf, end);
-	if (param_check("play", buf, pe))
-		process_play(buf, end);
-	else if (param_check("monitor", buf, pe))
-		process_monitor(buf, end);
-	else if (param_check("config", buf, pe))
-		process_config(buf, end);
+static void process_command(nstr_t cmd) {
+	nstr_t p1 = nstr_chop(cmd, '\x1F');
+	if (nstr_cmp_z(p1, "play"))
+		process_play(cmd);
+	else if (nstr_cmp_z(p1, "monitor"))
+		process_monitor(cmd);
+	else if (nstr_cmp_z(p1, "config"))
+		process_config(cmd);
 	else
-		fprintf(stderr, "Invalid command: %s\n", buf);
+		fprintf(stderr, "Invalid command: %s\n", nstr_z(cmd));
 }
 
-static const char *command_end(const char *buf, const char *end) {
-	const char *b = buf;
-	while (b < end) {
-		if ('\x1E' == *b)
-			return b;
-		++b;
-	}
-	return end;
-}
-
-static void process_commands(const char *buf, size_t n) {
-	const char *end = buf + n;
-	const char *c = buf;
-	while (c < end) {
-		const char *ce = command_end(c, end);
-		process_command(c, ce);
-		c = param_next(ce, end);
+static void process_commands(nstr_t str) {
+	while (nstr_len(str)) {
+		process_command(nstr_split(&str, '\x1E'));
 	}
 }
 
 static void load_command(const char *fname) {
 	char buf[128];
-	ssize_t n = config_load(fname, buf, 128);
-	if (n < 0)
-		return;
-	const char *end = buf + n;
-	process_command(buf, end);
+	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	process_commands(config_load(fname, str));
 }
 
 static void load_commands(uint32_t mon) {
@@ -271,8 +167,7 @@ void *command_thread(void *data) {
 			fprintf(stderr, "Read socket: %s\n", strerror(errno));
 			break;
 		}
-		buf[n] = '\0';
-		process_commands(buf, n);
+		process_commands(nstr_make(buf, 1024, n));
 	}
 	close(fd);
 out:
@@ -281,17 +176,17 @@ out:
 
 uint32_t load_config(void) {
 	char buf[128];
-	ssize_t n = config_load("config", buf, 128);
-	if (n < 0)
-		return 1;
-	const char *end = buf + n;
-	const char *pe = param_end(buf, end);
-	if (param_check("config", buf, pe)) {
-		const char *p2 = param_next(pe, end);
-		int m = parse_uint(p2, end);
-		return (m > 0) ? m : 1;
-	} else {
-		fprintf(stderr, "Invalid command: %s\n", buf);
-		return 1;
+	nstr_t str = config_load("config", nstr_make(buf, sizeof(buf), 0));
+	if (nstr_len(str)) {
+		nstr_t cmd = nstr_chop(str, '\x1E');
+		nstr_t p1 = nstr_split(&cmd, '\x1F');
+		if (nstr_cmp_z(p1, "config")) {
+			nstr_t p2 = nstr_split(&cmd, '\x1F');
+			int m = nstr_parse_u32(p2);
+			if (m > 0)
+				return m;
+		} else
+			fprintf(stderr, "Invalid command: %s\n", nstr_z(str));
 	}
+	return 1;
 }
