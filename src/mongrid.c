@@ -76,7 +76,7 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -40, NULL);
+	g_object_set(G_OBJECT(vbx), "bottom", -42, NULL);
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
@@ -104,7 +104,7 @@ static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
 	if (mc->width <= 0 || mc->height <= 0)
 		return;
 
-	int top = mc->height - 38;
+	int top = mc->height - 40;
 	int bottom = mc->height - 2;
 	int left = 2;
 	int right = mc->width - 2;
