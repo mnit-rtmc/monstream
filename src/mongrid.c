@@ -23,6 +23,8 @@
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 
+static const int BOX_HEIGHT = 54;
+
 struct moncell {
 	char		name[8];
 	char		mid[8];
@@ -38,6 +40,8 @@ struct moncell {
 	GstElement	*src;
 	GstElement	*depay;
 	GstElement	*decoder;
+	GstElement	*scaler;
+	GstElement	*filter;
 	GstElement	*videobox;
 	GstElement	*convert0;
 	GstElement	*draw_overlay;
@@ -72,10 +76,24 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	return src;
 }
 
+static GstElement *make_scaler(void) {
+	return gst_element_factory_make("videoscale", NULL);
+}
+
+static GstElement *make_filter(struct moncell *mc) {
+	GstElement *flt = gst_element_factory_make("capsfilter", NULL);
+	GstCaps *caps = gst_caps_new_simple("video/x-raw",
+		"width", G_TYPE_INT, mc->width - 2,
+		"height", G_TYPE_INT, mc->height - BOX_HEIGHT - 2, NULL);
+	g_object_set(G_OBJECT(flt), "caps", caps, NULL);
+	gst_caps_unref(caps);
+	return flt;
+}
+
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -46, NULL);
+	g_object_set(G_OBJECT(vbx), "bottom", -BOX_HEIGHT - 1, NULL);
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
@@ -89,9 +107,11 @@ static void prepare_draw_cb(GstElement *ovl, GstCaps *caps, gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	GstVideoInfo info;
 
-	if (gst_video_info_from_caps(&info, caps)) {
-		mc->width = info.width;
-		mc->height = info.height;
+	if (gst_video_info_from_caps(&info, caps) &&
+	   (mc->width != info.width || mc->height != info.height))
+	{
+		fprintf(stderr, "xvimage: %dx%d\n", mc->width, mc->height);
+		fprintf(stderr, "draw: %dx%d\n", info.width, info.height);
 	}
 }
 
@@ -100,10 +120,10 @@ static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
 {
 	struct moncell *mc = (struct moncell *) data;
 
-	if (mc->width <= 0 || mc->height <= 0)
+	if (mc->width <= 0 || mc->height < BOX_HEIGHT)
 		return;
 
-	int top = mc->height - 44;
+	int top = mc->height - BOX_HEIGHT + 2;
 	int bottom = mc->height - 2;
 	int left = 2;
 	int right = mc->width - 2;
@@ -152,10 +172,15 @@ static GstElement *make_txt_overlay(const char *desc, enum align a,
 }
 
 static GstElement *make_sink(struct moncell *mc) {
+	guint64 width, height;
 	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
 	g_object_set(G_OBJECT(sink), "force-aspect-ratio", FALSE, NULL);
+	g_object_get(G_OBJECT(sink), "window-width", &width,
+	                             "window-height", &height, NULL);
+	mc->width = width;
+	mc->height = height;
 	return sink;
 }
 
@@ -169,6 +194,8 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	moncell_remove_element(mc, mc->src);
 	moncell_remove_element(mc, mc->depay);
 	moncell_remove_element(mc, mc->decoder);
+	moncell_remove_element(mc, mc->scaler);
+	moncell_remove_element(mc, mc->filter);
 	moncell_remove_element(mc, mc->videobox);
 	moncell_remove_element(mc, mc->convert0);
 	moncell_remove_element(mc, mc->draw_overlay);
@@ -179,6 +206,8 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
+	mc->scaler = NULL;
+	mc->filter = NULL;
 	mc->videobox = NULL;
 	mc->convert0 = NULL;
 	mc->draw_overlay = NULL;
@@ -192,18 +221,21 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
+	mc->scaler = make_scaler();
 	mc->videobox = make_videobox();
 	mc->convert0 = make_convert();
 	mc->draw_overlay = make_draw(mc);
 	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
 	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
+	// NOTE: after sink to get width/height
+	mc->filter = make_filter(mc);
 
-	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->videobox,
-		mc->convert0, mc->draw_overlay, mc->mon_overlay, mc->convert1,
-		mc->sink, NULL);
-	if (!gst_element_link_many(mc->src, mc->videobox,
-	                           mc->convert0, mc->draw_overlay,
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->scaler, mc->filter,
+		mc->videobox, mc->convert0, mc->draw_overlay, mc->mon_overlay,
+		mc->convert1, mc->sink, NULL);
+	if (!gst_element_link_many(mc->src, mc->scaler, mc->filter,
+	                           mc->videobox, mc->convert0, mc->draw_overlay,
 	                           mc->mon_overlay, mc->convert1, mc->sink,
 	                           NULL))
 		fprintf(stderr, "Unable to link elements\n");
@@ -221,6 +253,7 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
+	mc->scaler = make_scaler();
 	mc->videobox = make_videobox();
 	mc->convert0 = make_convert();
 	mc->draw_overlay = make_draw(mc);
@@ -228,14 +261,18 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_BOTTOM);
 	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
+	// NOTE: after sink to get width/height
+	mc->filter = make_filter(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->videobox, mc->convert0, mc->draw_overlay, mc->mon_overlay,
-		mc->txt_overlay, mc->convert1, mc->sink, NULL);
-	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
-	                           mc->convert0, mc->draw_overlay,
-	                           mc->mon_overlay, mc->txt_overlay,
-	                           mc->convert1, mc->sink, NULL))
+		mc->scaler, mc->filter, mc->videobox, mc->convert0,
+		mc->draw_overlay, mc->mon_overlay, mc->txt_overlay,
+		mc->convert1, mc->sink, NULL);
+	if (!gst_element_link_many(mc->depay, mc->decoder, mc->scaler,
+	                           mc->filter, mc->videobox, mc->convert0,
+	                           mc->draw_overlay, mc->mon_overlay,
+	                           mc->txt_overlay, mc->convert1, mc->sink,
+	                           NULL))
 		fprintf(stderr, "Unable to link elements\n");
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -281,6 +318,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
+	mc->scaler = NULL;
+	mc->filter = NULL;
 	mc->videobox = NULL;
 	mc->convert0 = NULL;
 	mc->draw_overlay = NULL;
