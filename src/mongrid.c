@@ -159,28 +159,23 @@ static GstElement *make_sink(struct moncell *mc) {
 	return sink;
 }
 
+static void moncell_remove_element(struct moncell *mc, GstElement *elem) {
+	if (elem)
+		gst_bin_remove(GST_BIN(mc->pipeline), elem);
+}
+
 static void moncell_stop_pipeline(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_NULL);
-	if (mc->src)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->src);
-	if (mc->depay)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->depay);
-	if (mc->decoder)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->decoder);
-	if (mc->videobox)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->videobox);
-	if (mc->convert0)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->convert0);
-	if (mc->draw_overlay)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->draw_overlay);
-	if (mc->mon_overlay)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->mon_overlay);
-	if (mc->txt_overlay)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->txt_overlay);
-	if (mc->convert1)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->convert1);
-	if (mc->sink)
-		gst_bin_remove(GST_BIN(mc->pipeline), mc->sink);
+	moncell_remove_element(mc, mc->src);
+	moncell_remove_element(mc, mc->depay);
+	moncell_remove_element(mc, mc->decoder);
+	moncell_remove_element(mc, mc->videobox);
+	moncell_remove_element(mc, mc->convert0);
+	moncell_remove_element(mc, mc->draw_overlay);
+	moncell_remove_element(mc, mc->mon_overlay);
+	moncell_remove_element(mc, mc->txt_overlay);
+	moncell_remove_element(mc, mc->convert1);
+	moncell_remove_element(mc, mc->sink);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
