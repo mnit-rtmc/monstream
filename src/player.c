@@ -24,6 +24,10 @@
 #include <string.h>		/* for memset */
 #include "nstr.h"
 
+/* ASCII separators */
+static const char RECORD_SEP = '\x1E';
+static const char UNIT_SEP = '\x1F';
+
 void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
@@ -64,12 +68,12 @@ int open_bind(const char *service) {
 
 static void process_play(nstr_t cmd) {
 	nstr_t str = nstr_dup(cmd);
-	nstr_t p1 = nstr_split(&str, '\x1F');	// "play"
-	nstr_t p2 = nstr_split(&str, '\x1F');	// mon index
-	nstr_t p3 = nstr_split(&str, '\x1F');	// camera ID
-	nstr_t p4 = nstr_split(&str, '\x1F');	// stream URI
-	nstr_t p5 = nstr_split(&str, '\x1F');	// stream type
-	nstr_t p6 = nstr_split(&str, '\x1F');	// title
+	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "play"
+	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
+	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// camera ID
+	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// stream URI
+	nstr_t p5 = nstr_split(&str, UNIT_SEP);	// stream type
+	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// title
 	assert(nstr_cmp_z(p1, "play"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
@@ -94,10 +98,10 @@ static void process_play(nstr_t cmd) {
 
 static void process_monitor(nstr_t cmd) {
 	nstr_t str = nstr_dup(cmd);
-	nstr_t p1 = nstr_split(&str, '\x1F');	// "monitor"
-	nstr_t p2 = nstr_split(&str, '\x1F');	// mon index
-	nstr_t p3 = nstr_split(&str, '\x1F');	// monitor ID
-	nstr_t p4 = nstr_split(&str, '\x1F');	// accent color
+	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "monitor"
+	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
+	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// monitor ID
+	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// accent color
 	assert(nstr_cmp_z(p1, "monitor"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
@@ -118,7 +122,7 @@ static void process_config(nstr_t cmd) {
 }
 
 static void process_command(nstr_t cmd) {
-	nstr_t p1 = nstr_chop(cmd, '\x1F');
+	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "play"))
 		process_play(cmd);
 	else if (nstr_cmp_z(p1, "monitor"))
@@ -131,7 +135,7 @@ static void process_command(nstr_t cmd) {
 
 static void process_commands(nstr_t str) {
 	while (nstr_len(str)) {
-		process_command(nstr_split(&str, '\x1E'));
+		process_command(nstr_split(&str, RECORD_SEP));
 	}
 }
 
@@ -178,10 +182,10 @@ uint32_t load_config(void) {
 	char buf[128];
 	nstr_t str = config_load("config", nstr_make(buf, sizeof(buf), 0));
 	if (nstr_len(str)) {
-		nstr_t cmd = nstr_chop(str, '\x1E');
-		nstr_t p1 = nstr_split(&cmd, '\x1F');
+		nstr_t cmd = nstr_chop(str, RECORD_SEP);
+		nstr_t p1 = nstr_split(&cmd, UNIT_SEP);
 		if (nstr_cmp_z(p1, "config")) {
-			nstr_t p2 = nstr_split(&cmd, '\x1F');
+			nstr_t p2 = nstr_split(&cmd, UNIT_SEP);
 			int m = nstr_parse_u32(p2);
 			if (m > 0)
 				return m;
