@@ -52,7 +52,6 @@ static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 static GstElement *make_src_blank(void) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
 	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BLACK, NULL);
-	g_object_set(G_OBJECT(src), "foreground-color", 0x408020, NULL);
 	return src;
 }
 
@@ -76,7 +75,7 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -42, NULL);
+	g_object_set(G_OBJECT(vbx), "bottom", -46, NULL);
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
@@ -104,7 +103,7 @@ static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
 	if (mc->width <= 0 || mc->height <= 0)
 		return;
 
-	int top = mc->height - 40;
+	int top = mc->height - 44;
 	int bottom = mc->height - 2;
 	int left = 2;
 	int right = mc->width - 2;
@@ -140,7 +139,7 @@ static GstElement *make_txt_overlay(const char *desc, enum align a,
 {
 	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
 	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
-	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 20", NULL);
+	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 22", NULL);
 	g_object_set(G_OBJECT(ovl), "shaded-background", FALSE, NULL);
 	g_object_set(G_OBJECT(ovl), "shading-value", 255, NULL);
 	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
