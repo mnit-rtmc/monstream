@@ -23,33 +23,30 @@
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 
-static const int BOX_HEIGHT = 54;
-
 struct moncell {
 	char		name[8];
 	char		mid[8];
 	double		acc_red;
 	double		acc_green;
 	double		acc_blue;
-	GtkWidget	*widget;
+	GtkWidget	*box;
+	GtkWidget	*video;
+	GtkWidget	*mon_lbl;
+	GtkWidget	*cam_lbl;
 	guintptr	handle;
-	int		width;
-	int		height;
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*src;
 	GstElement	*depay;
 	GstElement	*decoder;
-	GstElement	*scaler;
-	GstElement	*filter;
 	GstElement	*videobox;
-	GstElement	*convert0;
-	GstElement	*draw_overlay;
-	GstElement	*mon_overlay;
-	GstElement	*txt_overlay;
-	GstElement	*convert1;
 	GstElement	*sink;
 };
+
+static void update_title(struct moncell *mc, const char *desc) {
+	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
+	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), desc);
+}
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -76,111 +73,20 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	return src;
 }
 
-static GstElement *make_scaler(void) {
-	return gst_element_factory_make("videoscale", NULL);
-}
-
-static GstElement *make_filter(struct moncell *mc) {
-	GstElement *flt = gst_element_factory_make("capsfilter", NULL);
-	GstCaps *caps = gst_caps_new_simple("video/x-raw",
-		"width", G_TYPE_INT, mc->width - 2,
-		"height", G_TYPE_INT, mc->height - BOX_HEIGHT - 2, NULL);
-	g_object_set(G_OBJECT(flt), "caps", caps, NULL);
-	gst_caps_unref(caps);
-	return flt;
-}
-
 static GstElement *make_videobox(void) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -BOX_HEIGHT - 1, NULL);
+	g_object_set(G_OBJECT(vbx), "bottom", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
 	return vbx;
 }
 
-static GstElement *make_convert(void) {
-	return gst_element_factory_make("videoconvert", NULL);
-}
-
-static void prepare_draw_cb(GstElement *ovl, GstCaps *caps, gpointer data) {
-	struct moncell *mc = (struct moncell *) data;
-	GstVideoInfo info;
-
-	if (gst_video_info_from_caps(&info, caps) &&
-	   (mc->width != info.width || mc->height != info.height))
-	{
-		fprintf(stderr, "xvimage: %dx%d\n", mc->width, mc->height);
-		fprintf(stderr, "draw: %dx%d\n", info.width, info.height);
-	}
-}
-
-static void do_draw_cb(GstElement *ovl, cairo_t *cr, guint64 timestamp,
-	guint64 duration, gpointer data)
-{
-	struct moncell *mc = (struct moncell *) data;
-
-	if (mc->width <= 0 || mc->height < BOX_HEIGHT)
-		return;
-
-	int top = mc->height - BOX_HEIGHT + 2;
-	int bottom = mc->height - 2;
-	int left = 2;
-	int right = mc->width - 2;
-
-	cairo_move_to(cr, left, top);
-	cairo_line_to(cr, right, top);
-	cairo_line_to(cr, right, bottom);
-	cairo_line_to(cr, left, bottom);
-	cairo_set_source_rgba(cr, mc->acc_red, mc->acc_green, mc->acc_blue, 1);
-	cairo_fill(cr);
-}
-
-static GstElement *make_draw(struct moncell *mc) {
-	GstElement *ovl = gst_element_factory_make("cairooverlay", NULL);
-	g_signal_connect(ovl, "caps-changed", G_CALLBACK(prepare_draw_cb), mc);
-	g_signal_connect(ovl, "draw", G_CALLBACK(do_draw_cb), mc);
-	return ovl;
-}
-
-enum align {
-	ALIGN_LEFT,
-	ALIGN_CENTER,
-	ALIGN_RIGHT,
-};
-enum valign {
-	VALIGN_BASELINE,
-	VALIGN_BOTTOM,
-	VALIGN_TOP,
-};
-
-static GstElement *make_txt_overlay(const char *desc, enum align a,
-	enum valign va)
-{
-	GstElement *ovl = gst_element_factory_make("textoverlay", NULL);
-	g_object_set(G_OBJECT(ovl), "text", desc, NULL);
-	g_object_set(G_OBJECT(ovl), "font-desc", "Cantarell, 22", NULL);
-	g_object_set(G_OBJECT(ovl), "shaded-background", FALSE, NULL);
-	g_object_set(G_OBJECT(ovl), "shading-value", 255, NULL);
-	g_object_set(G_OBJECT(ovl), "color", 0xFFFFFFE0, NULL);
-	g_object_set(G_OBJECT(ovl), "halignment", a, NULL);
-	g_object_set(G_OBJECT(ovl), "valignment", va, NULL);
-	g_object_set(G_OBJECT(ovl), "wrap-mode", -1, NULL); // no wrapping
-	g_object_set(G_OBJECT(ovl), "xpad", 8, NULL);
-	g_object_set(G_OBJECT(ovl), "ypad", 0, NULL);
-	return ovl;
-}
-
 static GstElement *make_sink(struct moncell *mc) {
-	guint64 width, height;
 	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
 	g_object_set(G_OBJECT(sink), "force-aspect-ratio", FALSE, NULL);
-	g_object_get(G_OBJECT(sink), "window-width", &width,
-	                             "window-height", &height, NULL);
-	mc->width = width;
-	mc->height = height;
 	return sink;
 }
 
@@ -194,50 +100,22 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	moncell_remove_element(mc, mc->src);
 	moncell_remove_element(mc, mc->depay);
 	moncell_remove_element(mc, mc->decoder);
-	moncell_remove_element(mc, mc->scaler);
-	moncell_remove_element(mc, mc->filter);
 	moncell_remove_element(mc, mc->videobox);
-	moncell_remove_element(mc, mc->convert0);
-	moncell_remove_element(mc, mc->draw_overlay);
-	moncell_remove_element(mc, mc->mon_overlay);
-	moncell_remove_element(mc, mc->txt_overlay);
-	moncell_remove_element(mc, mc->convert1);
 	moncell_remove_element(mc, mc->sink);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
-	mc->scaler = NULL;
-	mc->filter = NULL;
 	mc->videobox = NULL;
-	mc->convert0 = NULL;
-	mc->draw_overlay = NULL;
-	mc->mon_overlay = NULL;
-	mc->txt_overlay = NULL;
-	mc->convert1 = NULL;
 	mc->sink = NULL;
-	mc->width = 0;
-	mc->height = 0;
 }
 
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
-	mc->scaler = make_scaler();
-	mc->videobox = make_videobox();
-	mc->convert0 = make_convert();
-	mc->draw_overlay = make_draw(mc);
-	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
-	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
-	// NOTE: after sink to get width/height
-	mc->filter = make_filter(mc);
+	update_title(mc, "");
 
-	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->scaler, mc->filter,
-		mc->videobox, mc->convert0, mc->draw_overlay, mc->mon_overlay,
-		mc->convert1, mc->sink, NULL);
-	if (!gst_element_link_many(mc->src, mc->scaler, mc->filter,
-	                           mc->videobox, mc->convert0, mc->draw_overlay,
-	                           mc->mon_overlay, mc->convert1, mc->sink,
-	                           NULL))
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->sink, NULL);
+	if (!gst_element_link_many(mc->src, mc->sink, NULL))
 		fprintf(stderr, "Unable to link elements\n");
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -253,27 +131,16 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
-	mc->scaler = make_scaler();
 	mc->videobox = make_videobox();
-	mc->convert0 = make_convert();
-	mc->draw_overlay = make_draw(mc);
-	mc->mon_overlay = make_txt_overlay(mc->mid, ALIGN_LEFT, VALIGN_BOTTOM);
-	mc->txt_overlay = make_txt_overlay(desc, ALIGN_RIGHT, VALIGN_BOTTOM);
-	mc->convert1 = make_convert();
 	mc->sink = make_sink(mc);
-	// NOTE: after sink to get width/height
-	mc->filter = make_filter(mc);
+	update_title(mc, desc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
-		mc->scaler, mc->filter, mc->videobox, mc->convert0,
-		mc->draw_overlay, mc->mon_overlay, mc->txt_overlay,
-		mc->convert1, mc->sink, NULL);
-	if (!gst_element_link_many(mc->depay, mc->decoder, mc->scaler,
-	                           mc->filter, mc->videobox, mc->convert0,
-	                           mc->draw_overlay, mc->mon_overlay,
-	                           mc->txt_overlay, mc->convert1, mc->sink,
-	                           NULL))
+		mc->videobox, mc->sink, NULL);
+	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
+	                           mc->sink, NULL))
 		fprintf(stderr, "Unable to link elements\n");
+
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
@@ -302,35 +169,58 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
+static GtkWidget *create_title(void) {
+	GdkRGBA rgba;
+	GtkWidget *title = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+	gdk_rgba_parse(&rgba, "#406040");
+	gtk_widget_override_background_color(title, GTK_STATE_FLAG_NORMAL,
+		&rgba);
+	return title;
+}
+
+static GtkWidget *create_label(void) {
+	GdkRGBA rgba;
+	GtkWidget *lbl = gtk_label_new("");
+	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
+	g_object_set(G_OBJECT(lbl), "single-line-mode", TRUE, NULL);
+	gtk_widget_override_font(lbl, pango_font_description_from_string(
+		"Cantarell Bold 32"));
+	gdk_rgba_parse(&rgba, "#406040");
+	gtk_widget_override_background_color(lbl, GTK_STATE_FLAG_NORMAL, &rgba);
+	gdk_rgba_parse(&rgba, "#FFFFFF");
+	gtk_widget_override_color(lbl, GTK_STATE_FLAG_NORMAL, &rgba);
+	return lbl;
+}
+
 static void moncell_init(struct moncell *mc, uint32_t idx) {
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, 8);
 	mc->acc_red = 0.0;
 	mc->acc_green = 0.2;
 	mc->acc_blue = 0.0;
-	mc->widget = gtk_drawing_area_new();
+	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	mc->video = gtk_drawing_area_new();
+	mc->mon_lbl = create_label();
+	mc->cam_lbl = create_label();
 	mc->handle = 0;
-	mc->width = 0;
-	mc->height = 0;
 	mc->pipeline = gst_pipeline_new(mc->name);
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
 	gst_bus_add_watch(mc->bus, bus_cb, mc);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
-	mc->scaler = NULL;
-	mc->filter = NULL;
 	mc->videobox = NULL;
-	mc->convert0 = NULL;
-	mc->draw_overlay = NULL;
-	mc->mon_overlay = NULL;
-	mc->txt_overlay = NULL;
-	mc->convert1 = NULL;
 	mc->sink = NULL;
+	update_title(mc, "");
+	GtkWidget *title = create_title();
+	gtk_box_pack_start(GTK_BOX(title), mc->mon_lbl, FALSE, FALSE, 8);
+	gtk_box_pack_end(GTK_BOX(title), mc->cam_lbl, FALSE, FALSE, 8);
+	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
+	gtk_box_pack_end(GTK_BOX(mc->box), title, FALSE, FALSE, 1);
 }
 
 static void moncell_set_handle(struct moncell *mc) {
-	mc->handle = GDK_WINDOW_XID(gtk_widget_get_window(mc->widget));
+	mc->handle = GDK_WINDOW_XID(gtk_widget_get_window(mc->video));
 }
 
 static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
@@ -420,7 +310,7 @@ int32_t mongrid_init(uint32_t num) {
 			uint32_t i = r * grid.cols + c;
 			struct moncell *mc = grid.cells + i;
 			moncell_init(mc, i);
-			gtk_grid_attach(gtk_grid, mc->widget, c, r, 1, 1);
+			gtk_grid_attach(gtk_grid, mc->box, c, r, 1, 1);
 		}
 	}
 	gtk_container_add(GTK_CONTAINER(window), (GtkWidget *) gtk_grid);
