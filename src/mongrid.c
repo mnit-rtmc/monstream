@@ -66,7 +66,7 @@ static void source_pad_added_cb(GstElement *src, GstPad *pad, gpointer data) {
 static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", loc, NULL);
-	g_object_set(G_OBJECT(src), "latency", 2, NULL);
+	g_object_set(G_OBJECT(src), "latency", 50, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
