@@ -26,11 +26,10 @@
 struct moncell {
 	char		name[8];
 	char		mid[8];
-	double		acc_red;
-	double		acc_green;
-	double		acc_blue;
+	char		accent[8];
 	GtkWidget	*box;
 	GtkWidget	*video;
+	GtkWidget	*title;
 	GtkWidget	*mon_lbl;
 	GtkWidget	*cam_lbl;
 	guintptr	handle;
@@ -42,11 +41,6 @@ struct moncell {
 	GstElement	*videobox;
 	GstElement	*sink;
 };
-
-static void update_title(struct moncell *mc, const char *desc) {
-	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
-	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), desc);
-}
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -109,10 +103,21 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->sink = NULL;
 }
 
+static void moncell_update_title(struct moncell *mc, const char *desc) {
+	GdkRGBA rgba;
+	if (gdk_rgba_parse(&rgba, mc->accent)) {
+		gtk_widget_override_background_color(mc->title,
+			GTK_STATE_FLAG_NORMAL, &rgba);
+	}
+	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
+	if (desc)
+		gtk_label_set_text(GTK_LABEL(mc->cam_lbl), desc);
+}
+
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
 	mc->sink = make_sink(mc);
-	update_title(mc, "");
+	moncell_update_title(mc, "");
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->sink, NULL))
@@ -133,7 +138,7 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	}
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
-	update_title(mc, desc);
+	moncell_update_title(mc, desc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->sink, NULL);
@@ -170,12 +175,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 }
 
 static GtkWidget *create_title(void) {
-	GdkRGBA rgba;
-	GtkWidget *title = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
-	gdk_rgba_parse(&rgba, "#406040");
-	gtk_widget_override_background_color(title, GTK_STATE_FLAG_NORMAL,
-		&rgba);
-	return title;
+	return gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 }
 
 static GtkWidget *create_label(void) {
@@ -185,8 +185,6 @@ static GtkWidget *create_label(void) {
 	g_object_set(G_OBJECT(lbl), "single-line-mode", TRUE, NULL);
 	gtk_widget_override_font(lbl, pango_font_description_from_string(
 		"Cantarell Bold 32"));
-	gdk_rgba_parse(&rgba, "#406040");
-	gtk_widget_override_background_color(lbl, GTK_STATE_FLAG_NORMAL, &rgba);
 	gdk_rgba_parse(&rgba, "#FFFFFF");
 	gtk_widget_override_color(lbl, GTK_STATE_FLAG_NORMAL, &rgba);
 	return lbl;
@@ -195,11 +193,10 @@ static GtkWidget *create_label(void) {
 static void moncell_init(struct moncell *mc, uint32_t idx) {
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, 8);
-	mc->acc_red = 0.0;
-	mc->acc_green = 0.2;
-	mc->acc_blue = 0.0;
+	memset(mc->accent, 0, 8);
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
+	mc->title = create_title();
 	mc->mon_lbl = create_label();
 	mc->cam_lbl = create_label();
 	mc->handle = 0;
@@ -211,12 +208,11 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->decoder = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
-	update_title(mc, "");
-	GtkWidget *title = create_title();
-	gtk_box_pack_start(GTK_BOX(title), mc->mon_lbl, FALSE, FALSE, 8);
-	gtk_box_pack_end(GTK_BOX(title), mc->cam_lbl, FALSE, FALSE, 8);
+	moncell_update_title(mc, "");
+	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 8);
+	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 8);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
-	gtk_box_pack_end(GTK_BOX(mc->box), title, FALSE, FALSE, 1);
+	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 1);
 }
 
 static void moncell_set_handle(struct moncell *mc) {
@@ -232,12 +228,12 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 }
 
 static void moncell_set_id(struct moncell *mc, const char *mid,
-	uint32_t accent)
+	const char *accent)
 {
 	strncpy(mc->mid, mid, 8);
-	mc->acc_red   = ((accent >> 16) & 0xFF) / 256.0;
-	mc->acc_green = ((accent >>  8) & 0xFF) / 256.0;
-	mc->acc_blue  = ((accent >>  0) & 0xFF) / 256.0;
+	mc->accent[0] = '#';
+	strncpy(mc->accent + 1, accent, 7);
+	moncell_update_title(mc, NULL);
 }
 
 struct mongrid {
@@ -325,7 +321,7 @@ int32_t mongrid_init(uint32_t num) {
 	return 0;
 }
 
-void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent) {
+void mongrid_set_id(uint32_t idx, const char *mid, const char *accent) {
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
 		return moncell_set_id(mc, mid, accent);

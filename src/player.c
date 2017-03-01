@@ -28,7 +28,7 @@
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-void mongrid_set_id(uint32_t idx, const char *mid, uint32_t accent);
+void mongrid_set_id(uint32_t idx, const char *mid, const char *accent);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
@@ -106,10 +106,11 @@ static void process_monitor(nstr_t cmd) {
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
 		char mid[8];
+		char accent[8];
 		char fname[16];
 		nstr_wrap(mid, sizeof(mid), p3);
-		int32_t acc = nstr_parse_hex(p4);
-		mongrid_set_id(mon, mid, acc);
+		nstr_wrap(accent, sizeof(accent), p4);
+		mongrid_set_id(mon, mid, accent);
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
 	} else
