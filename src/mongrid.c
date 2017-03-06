@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,7 @@
 #include <gtk/gtk.h>
 
 struct moncell {
+	pthread_mutex_t mutex;
 	char		name[8];
 	char		mid[8];
 	char		accent[8];
@@ -149,13 +151,31 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
+static void moncell_lock(struct moncell *mc) {
+	int rc = pthread_mutex_lock(&mc->mutex);
+	if (rc)
+		fprintf(stderr, "pthread_mutex_lock: %s\n", strerror(rc));
+}
+
+static void moncell_unlock(struct moncell *mc) {
+	int rc = pthread_mutex_unlock(&mc->mutex);
+	if (rc)
+		fprintf(stderr, "pthread_mutex_unlock: %s\n", strerror(rc));
+}
+
+static void moncell_stop_stream(struct moncell *mc) {
+	moncell_lock(mc);
+	moncell_stop_pipeline(mc);
+	moncell_start_blank(mc);
+	moncell_unlock(mc);
+}
+
 static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		fprintf(stderr, "End of stream\n");
-		moncell_stop_pipeline(mc);
-		moncell_start_blank(mc);
+		moncell_stop_stream(mc);
 		break;
 	case GST_MESSAGE_ERROR: {
 		gchar *debug;
@@ -164,8 +184,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		g_free(debug);
 		fprintf(stderr, "GST Error: %s\n", error->message);
 		g_error_free(error);
-		moncell_stop_pipeline(mc);
-		moncell_start_blank(mc);
+		moncell_stop_stream(mc);
 		break;
 	}
 	default:
@@ -191,6 +210,9 @@ static GtkWidget *create_label(void) {
 }
 
 static void moncell_init(struct moncell *mc, uint32_t idx) {
+	int rc = pthread_mutex_init(&mc->mutex, NULL);
+	if (rc)
+		fprintf(stderr, "pthread_mutex_init: %s\n", strerror(rc));
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, 8);
 	memset(mc->accent, 0, 8);
@@ -222,8 +244,10 @@ static void moncell_set_handle(struct moncell *mc) {
 static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
+	moncell_lock(mc);
 	moncell_stop_pipeline(mc);
 	moncell_start_pipeline(mc, loc, desc, stype);
+	moncell_unlock(mc);
 	return 1;
 }
 
