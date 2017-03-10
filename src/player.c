@@ -83,7 +83,7 @@ static void process_play(nstr_t cmd) {
 		char fname[16];
 		nstr_t d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
 		if (nstr_len(p6)) {
-			nstr_cat_z(&d, " --- ");
+			nstr_cat_z(&d, " | ");
 			nstr_cat(&d, p6);
 		}
 		nstr_z(d);
