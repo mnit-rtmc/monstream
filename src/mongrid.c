@@ -197,10 +197,12 @@ static GtkWidget *create_title(void) {
 	return gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 }
 
-static GtkWidget *create_label(void) {
+static GtkWidget *create_label(int n_chars) {
 	GdkRGBA rgba;
 	GtkWidget *lbl = gtk_label_new("");
 	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
+	if (n_chars)
+		gtk_label_set_max_width_chars(GTK_LABEL(lbl), n_chars);
 	g_object_set(G_OBJECT(lbl), "single-line-mode", TRUE, NULL);
 	gtk_widget_override_font(lbl, pango_font_description_from_string(
 		"Cantarell Bold 32"));
@@ -219,8 +221,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
 	mc->title = create_title();
-	mc->mon_lbl = create_label();
-	mc->cam_lbl = create_label();
+	mc->mon_lbl = create_label(6);
+	mc->cam_lbl = create_label(0);
 	mc->handle = 0;
 	mc->pipeline = gst_pipeline_new(mc->name);
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
