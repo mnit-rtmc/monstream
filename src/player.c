@@ -35,7 +35,7 @@ int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 nstr_t config_load(const char *name, nstr_t str);
 ssize_t config_store(const char *name, nstr_t cmd);
 
-int open_bind(const char *service) {
+static int open_bind(const char *service) {
 	struct addrinfo hints;
 	struct addrinfo *ai;
 	struct addrinfo *rai = NULL;

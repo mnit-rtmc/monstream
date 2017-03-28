@@ -23,7 +23,7 @@ Commands are separated by ASCII record separator (30).
 2. Monitor index (0 to 15)
 3. Camera ID
 4. Stream request URI
-5. Stream type: "MPEG4", "H264", "STILL"
+5. Stream type: "MPEG4", "H264", "PNG"
 6. Title: ASCII text description
 
 ## UDP response

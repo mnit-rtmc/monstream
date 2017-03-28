@@ -40,6 +40,8 @@ struct moncell {
 	GstElement	*src;
 	GstElement	*depay;
 	GstElement	*decoder;
+	GstElement	*convert;
+	GstElement	*freezer;
 	GstElement	*videobox;
 	GstElement	*sink;
 };
@@ -66,6 +68,12 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
+	return src;
+}
+
+static GstElement *make_src_http(struct moncell *mc, const char *loc) {
+	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
+	g_object_set(G_OBJECT(src), "location", loc, NULL);
 	return src;
 }
 
@@ -96,11 +104,15 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	moncell_remove_element(mc, mc->src);
 	moncell_remove_element(mc, mc->depay);
 	moncell_remove_element(mc, mc->decoder);
+	moncell_remove_element(mc, mc->convert);
+	moncell_remove_element(mc, mc->freezer);
 	moncell_remove_element(mc, mc->videobox);
 	moncell_remove_element(mc, mc->sink);
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
+	mc->convert = NULL;
+	mc->freezer = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
 }
@@ -127,11 +139,35 @@ static void moncell_start_blank(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
+static void moncell_start_png(struct moncell *mc, const char *loc,
+	const char *desc)
+{
+	mc->src = make_src_http(mc, loc);
+	mc->decoder = gst_element_factory_make("pngdec", NULL);
+	mc->convert = gst_element_factory_make("videoconvert", NULL);
+	mc->freezer = gst_element_factory_make("imagefreeze", NULL);
+	mc->videobox = make_videobox();
+	mc->sink = make_sink(mc);
+	moncell_update_title(mc, desc);
+
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->decoder,
+		mc->convert, mc->freezer, mc->videobox, mc->sink, NULL);
+	if (!gst_element_link_many(mc->src, mc->decoder, mc->convert,
+	                           mc->freezer, mc->videobox, mc->sink, NULL))
+		fprintf(stderr, "Unable to link elements\n");
+
+	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
+}
+
 static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
+	if (strcmp("PNG", stype) == 0) {
+		moncell_start_png(mc, loc, desc);
+		return;
+	}
 	mc->src = make_src_rtsp(mc, loc);
-	if (memcmp(stype, "H264", 4) == 0) {
+	if (strcmp("H264", stype) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
 	} else {
@@ -230,6 +266,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->src = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
+	mc->convert = NULL;
+	mc->freezer = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
 	moncell_update_title(mc, "");
