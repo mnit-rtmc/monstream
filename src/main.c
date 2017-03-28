@@ -18,15 +18,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define VERSION "0.1"
+#define BANNER "monstream: v" VERSION "  Copyright (C)  MnDOT\n"
+
 uint32_t load_config(void);
 void *command_thread(void *data);
 int32_t mongrid_init(uint32_t num);
 
 int main(void) {
 	pthread_t thread;
-	uint32_t mon = load_config();
+	uint32_t mon;
 	int rc;
 
+	printf(BANNER);
+
+	mon = load_config();
 	if (mongrid_init(mon))
 		return -1;
 	rc = pthread_create(&thread, NULL, command_thread, &mon);
