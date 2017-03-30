@@ -35,6 +35,9 @@ struct moncell {
 	GtkWidget	*mon_lbl;
 	GtkWidget	*cam_lbl;
 	guintptr	handle;
+	char		location[128];
+	char		description[64];
+	char		stype[8];
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*src;
@@ -47,6 +50,18 @@ struct moncell {
 };
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
+
+static void moncell_set_location(struct moncell *mc, const char *loc) {
+	strncpy(mc->location, loc, sizeof(mc->location));
+}
+
+static void moncell_set_description(struct moncell *mc, const char *desc) {
+	strncpy(mc->description, desc, sizeof(mc->description));
+}
+
+static void moncell_set_stype(struct moncell *mc, const char *stype) {
+	strncpy(mc->stype, stype, sizeof(mc->stype));
+}
 
 static GstElement *make_src_blank(void) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
@@ -61,9 +76,9 @@ static void source_pad_added_cb(GstElement *src, GstPad *pad, gpointer data) {
 	gst_object_unref(spad);
 }
 
-static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
+static GstElement *make_src_rtsp(struct moncell *mc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
-	g_object_set(G_OBJECT(src), "location", loc, NULL);
+	g_object_set(G_OBJECT(src), "location", mc->location, NULL);
 	g_object_set(G_OBJECT(src), "latency", 50, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
@@ -71,9 +86,9 @@ static GstElement *make_src_rtsp(struct moncell *mc, const char *loc) {
 	return src;
 }
 
-static GstElement *make_src_http(struct moncell *mc, const char *loc) {
+static GstElement *make_src_http(struct moncell *mc) {
 	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
-	g_object_set(G_OBJECT(src), "location", loc, NULL);
+	g_object_set(G_OBJECT(src), "location", mc->location, NULL);
 	return src;
 }
 
@@ -117,21 +132,21 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->sink = NULL;
 }
 
-static void moncell_update_title(struct moncell *mc, const char *desc) {
+static void moncell_update_title(struct moncell *mc) {
 	GdkRGBA rgba;
 	if (gdk_rgba_parse(&rgba, mc->accent)) {
 		gtk_widget_override_background_color(mc->title,
 			GTK_STATE_FLAG_NORMAL, &rgba);
 	}
 	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
-	if (desc)
-		gtk_label_set_text(GTK_LABEL(mc->cam_lbl), desc);
+	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->description);
 }
 
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
 	mc->sink = make_sink(mc);
-	moncell_update_title(mc, "");
+	moncell_set_description(mc, "");
+	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->sink, NULL))
@@ -139,16 +154,14 @@ static void moncell_start_blank(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static void moncell_start_png(struct moncell *mc, const char *loc,
-	const char *desc)
-{
-	mc->src = make_src_http(mc, loc);
+static void moncell_start_png(struct moncell *mc) {
+	mc->src = make_src_http(mc);
 	mc->decoder = gst_element_factory_make("pngdec", NULL);
 	mc->convert = gst_element_factory_make("videoconvert", NULL);
 	mc->freezer = gst_element_factory_make("imagefreeze", NULL);
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
-	moncell_update_title(mc, desc);
+	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->decoder,
 		mc->convert, mc->freezer, mc->videobox, mc->sink, NULL);
@@ -159,15 +172,13 @@ static void moncell_start_png(struct moncell *mc, const char *loc,
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static void moncell_start_pipeline(struct moncell *mc, const char *loc,
-	const char *desc, const char *stype)
-{
-	if (strcmp("PNG", stype) == 0) {
-		moncell_start_png(mc, loc, desc);
+static void moncell_start_pipeline(struct moncell *mc) {
+	if (strcmp("PNG", mc->stype) == 0) {
+		moncell_start_png(mc);
 		return;
 	}
-	mc->src = make_src_rtsp(mc, loc);
-	if (strcmp("H264", stype) == 0) {
+	mc->src = make_src_rtsp(mc);
+	if (strcmp("H264", mc->stype) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
 	} else {
@@ -176,7 +187,7 @@ static void moncell_start_pipeline(struct moncell *mc, const char *loc,
 	}
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
-	moncell_update_title(mc, desc);
+	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->sink, NULL);
@@ -252,8 +263,11 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	if (rc)
 		fprintf(stderr, "pthread_mutex_init: %s\n", strerror(rc));
 	snprintf(mc->name, 8, "m%d", idx);
-	memset(mc->mid, 0, 8);
-	memset(mc->accent, 0, 8);
+	memset(mc->mid, 0, sizeof(mc->mid));
+	memset(mc->accent, 0, sizeof(mc->accent));
+	memset(mc->location, 0, sizeof(mc->location));
+	memset(mc->description, 0, sizeof(mc->description));
+	memset(mc->stype, 0, sizeof(mc->stype));
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
 	mc->title = create_title();
@@ -270,7 +284,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->freezer = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
-	moncell_update_title(mc, "");
+	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 8);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 8);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
@@ -285,8 +299,11 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	const char *desc, const char *stype)
 {
 	moncell_lock(mc);
+	moncell_set_location(mc, loc);
+	moncell_set_description(mc, desc);
+	moncell_set_stype(mc, stype);
 	moncell_stop_pipeline(mc);
-	moncell_start_pipeline(mc, loc, desc, stype);
+	moncell_start_pipeline(mc);
 	moncell_unlock(mc);
 	return 1;
 }
@@ -294,10 +311,10 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 static void moncell_set_id(struct moncell *mc, const char *mid,
 	const char *accent)
 {
-	strncpy(mc->mid, mid, 8);
+	strncpy(mc->mid, mid, sizeof(mc->mid));
 	mc->accent[0] = '#';
-	strncpy(mc->accent + 1, accent, 7);
-	moncell_update_title(mc, NULL);
+	strncpy(mc->accent + 1, accent, sizeof(mc->accent) - 1);
+	moncell_update_title(mc);
 }
 
 struct mongrid {
