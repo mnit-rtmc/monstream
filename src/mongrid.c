@@ -47,7 +47,10 @@ struct moncell {
 	GstElement	*freezer;
 	GstElement	*videobox;
 	GstElement	*sink;
+	gboolean	stopped;
 };
+
+#define ACCENT_GRAY	"#444444"
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -132,12 +135,15 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->sink = NULL;
 }
 
-static void moncell_update_title(struct moncell *mc) {
+static void moncell_set_accent(struct moncell *mc, const char *accent) {
 	GdkRGBA rgba;
-	if (gdk_rgba_parse(&rgba, mc->accent)) {
+	if (gdk_rgba_parse(&rgba, accent)) {
 		gtk_widget_override_background_color(mc->title,
 			GTK_STATE_FLAG_NORMAL, &rgba);
 	}
+}
+
+static void moncell_update_title(struct moncell *mc) {
 	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
 	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->description);
 }
@@ -145,8 +151,6 @@ static void moncell_update_title(struct moncell *mc) {
 static void moncell_start_blank(struct moncell *mc) {
 	mc->src = make_src_blank();
 	mc->sink = make_sink(mc);
-	moncell_set_description(mc, "");
-	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->sink, NULL))
@@ -161,7 +165,6 @@ static void moncell_start_png(struct moncell *mc) {
 	mc->freezer = gst_element_factory_make("imagefreeze", NULL);
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
-	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->decoder,
 		mc->convert, mc->freezer, mc->videobox, mc->sink, NULL);
@@ -187,7 +190,6 @@ static void moncell_start_pipeline(struct moncell *mc) {
 	}
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
-	moncell_update_title(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->sink, NULL);
@@ -212,8 +214,18 @@ static void moncell_unlock(struct moncell *mc) {
 
 static void moncell_stop_stream(struct moncell *mc) {
 	moncell_lock(mc);
+	moncell_set_accent(mc, ACCENT_GRAY);
 	moncell_stop_pipeline(mc);
 	moncell_start_blank(mc);
+	mc->stopped = TRUE;
+	moncell_unlock(mc);
+}
+
+static void moncell_restart_stream(struct moncell *mc) {
+	moncell_lock(mc);
+	moncell_stop_pipeline(mc);
+	moncell_start_pipeline(mc);
+	mc->stopped = FALSE;
 	moncell_unlock(mc);
 }
 
@@ -221,7 +233,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
-		fprintf(stderr, "End of stream\n");
+		fprintf(stderr, "End of stream: %s\n", mc->location);
 		moncell_stop_stream(mc);
 		break;
 	case GST_MESSAGE_ERROR: {
@@ -229,9 +241,17 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		GError *error;
 		gst_message_parse_error(msg, &error, &debug);
 		g_free(debug);
-		fprintf(stderr, "GST Error: %s\n", error->message);
+		fprintf(stderr, "Error: %s  %s\n", error->message,
+			mc->location);
 		g_error_free(error);
 		moncell_stop_stream(mc);
+		break;
+	}
+	case GST_MESSAGE_ASYNC_DONE: {
+		if (mc->stopped)
+			moncell_restart_stream(mc);
+		else
+			moncell_set_accent(mc, mc->accent);
 		break;
 	}
 	default:
@@ -284,6 +304,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->freezer = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
+	mc->stopped = TRUE;
+	moncell_set_accent(mc, ACCENT_GRAY);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 8);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 8);
@@ -302,9 +324,10 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	moncell_set_location(mc, loc);
 	moncell_set_description(mc, desc);
 	moncell_set_stype(mc, stype);
-	moncell_stop_pipeline(mc);
-	moncell_start_pipeline(mc);
+	moncell_update_title(mc);
 	moncell_unlock(mc);
+	/* Stopping the stream will trigger a restart */
+	moncell_stop_stream(mc);
 	return 1;
 }
 
@@ -314,6 +337,7 @@ static void moncell_set_id(struct moncell *mc, const char *mid,
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	mc->accent[0] = '#';
 	strncpy(mc->accent + 1, accent, sizeof(mc->accent) - 1);
+	moncell_set_accent(mc, mc->accent);
 	moncell_update_title(mc);
 }
 
