@@ -181,8 +181,7 @@ void *command_thread(void *data) {
 		while (read_commands(fd)) { }
 		close(fd);
 	}
-	/* FIXME: main thread should cleanup and restart */
-	exit(0);
+	gtk_main_quit();
 	return NULL;
 }
 

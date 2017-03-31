@@ -313,6 +313,20 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 1);
 }
 
+static void moncell_destroy(struct moncell *mc) {
+	int rc;
+
+	moncell_lock(mc);
+	moncell_stop_pipeline(mc);
+	gst_bus_remove_watch(mc->bus);
+	g_object_unref(mc->pipeline);
+	mc->pipeline = NULL;
+	moncell_unlock(mc);
+	rc = pthread_mutex_destroy(&mc->mutex);
+	if (rc)
+		fprintf(stderr, "pthread_mutex_destroy: %s\n", strerror(rc));
+}
+
 static void moncell_set_handle(struct moncell *mc) {
 	mc->handle = GDK_WINDOW_XID(gtk_widget_get_window(mc->video));
 }
@@ -397,8 +411,6 @@ int32_t mongrid_init(uint32_t num) {
 	grid.cols = get_cols(num);
 	num = grid.rows * grid.cols;
 	grid.cells = calloc(num, sizeof(struct moncell));
-	gst_init(NULL, NULL);
-	gtk_init(NULL, NULL);
 	window = gtk_window_new(0);
 	grid.window = window;
 	gtk_grid = (GtkGrid *) gtk_grid_new();
@@ -441,4 +453,20 @@ int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 		return moncell_play_stream(mc, loc, desc, stype);
 	} else
 		return 1;
+}
+
+void mongrid_destroy(void) {
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct moncell *mc = grid.cells + i;
+			moncell_destroy(mc);
+		}
+	}
+	gtk_widget_destroy(grid.window);
+	grid.window = NULL;
+	free(grid.cells);
+	grid.cells = NULL;
+	grid.rows = 0;
+	grid.cols = 0;
 }
