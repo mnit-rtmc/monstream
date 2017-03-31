@@ -119,25 +119,28 @@ static void process_monitor(nstr_t cmd) {
 
 static void process_config(nstr_t cmd) {
 	config_store("config", cmd);
-	exit(0);
 }
 
-static void process_command(nstr_t cmd) {
+static bool process_command(nstr_t cmd) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "play"))
 		process_play(cmd);
 	else if (nstr_cmp_z(p1, "monitor"))
 		process_monitor(cmd);
-	else if (nstr_cmp_z(p1, "config"))
+	else if (nstr_cmp_z(p1, "config")) {
 		process_config(cmd);
-	else
+		return false;
+	} else
 		fprintf(stderr, "Invalid command: %s\n", nstr_z(cmd));
+	return true;
 }
 
-static void process_commands(nstr_t str) {
+static bool process_commands(nstr_t str) {
 	while (nstr_len(str)) {
-		process_command(nstr_split(&str, RECORD_SEP));
+		if (!process_command(nstr_split(&str, RECORD_SEP)))
+			return false;
 	}
+	return true;
 }
 
 static void load_command(const char *fname) {
@@ -157,25 +160,29 @@ static void load_commands(uint32_t mon) {
 	}
 }
 
+static bool read_commands(int fd) {
+	char buf[1024];
+	ssize_t n = read(fd, buf, 1023);
+
+	if (n < 0) {
+		fprintf(stderr, "Read socket: %s\n", strerror(errno));
+		return false;
+	}
+	return process_commands(nstr_make(buf, 1024, n));
+}
+
 void *command_thread(void *data) {
 	uint32_t *mon = data;
-	char buf[1024];
 	int fd;
 
 	load_commands(*mon);
 	fd = open_bind("7001");
-	if (fd < 0)
-		goto out;
-	while (true) {
-		ssize_t n = read(fd, buf, 1023);
-		if (n < 0) {
-			fprintf(stderr, "Read socket: %s\n", strerror(errno));
-			break;
-		}
-		process_commands(nstr_make(buf, 1024, n));
+	if (fd > 0) {
+		while (read_commands(fd)) { }
+		close(fd);
 	}
-	close(fd);
-out:
+	/* FIXME: main thread should cleanup and restart */
+	exit(0);
 	return NULL;
 }
 
