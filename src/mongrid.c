@@ -47,7 +47,7 @@ struct moncell {
 	GstElement	*freezer;
 	GstElement	*videobox;
 	GstElement	*sink;
-	gboolean	stopped;
+	gboolean	started;
 };
 
 #define ACCENT_GRAY	"#444444"
@@ -212,20 +212,37 @@ static void moncell_unlock(struct moncell *mc) {
 		fprintf(stderr, "pthread_mutex_unlock: %s\n", strerror(rc));
 }
 
-static void moncell_stop_stream(struct moncell *mc) {
+static void moncell_restart_stream(struct moncell *mc) {
+	moncell_lock(mc);
+	if (!mc->started) {
+		moncell_stop_pipeline(mc);
+		moncell_start_pipeline(mc);
+		mc->started = TRUE;
+	}
+	moncell_unlock(mc);
+}
+
+static gboolean do_restart(gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	moncell_restart_stream(mc);
+	return FALSE;
+}
+
+static void moncell_stop_stream(struct moncell *mc, guint delay) {
 	moncell_lock(mc);
 	moncell_set_accent(mc, ACCENT_GRAY);
 	moncell_stop_pipeline(mc);
 	moncell_start_blank(mc);
-	mc->stopped = TRUE;
+	mc->started = FALSE;
+	/* delay is needed to allow gtk+ to update accent color */
+	g_timeout_add(delay, do_restart, mc);
 	moncell_unlock(mc);
 }
 
-static void moncell_restart_stream(struct moncell *mc) {
+static void moncell_ack_started(struct moncell *mc) {
 	moncell_lock(mc);
-	moncell_stop_pipeline(mc);
-	moncell_start_pipeline(mc);
-	mc->stopped = FALSE;
+	if (mc->started)
+		moncell_set_accent(mc, mc->accent);
 	moncell_unlock(mc);
 }
 
@@ -234,7 +251,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		fprintf(stderr, "End of stream: %s\n", mc->location);
-		moncell_stop_stream(mc);
+		moncell_stop_stream(mc, 500);
 		break;
 	case GST_MESSAGE_ERROR: {
 		gchar *debug;
@@ -244,16 +261,12 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		fprintf(stderr, "Error: %s  %s\n", error->message,
 			mc->location);
 		g_error_free(error);
-		moncell_stop_stream(mc);
+		moncell_stop_stream(mc, 500);
 		break;
 	}
-	case GST_MESSAGE_ASYNC_DONE: {
-		if (mc->stopped)
-			moncell_restart_stream(mc);
-		else
-			moncell_set_accent(mc, mc->accent);
+	case GST_MESSAGE_ASYNC_DONE:
+		moncell_ack_started(mc);
 		break;
-	}
 	default:
 		break;
 	}
@@ -304,7 +317,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->freezer = NULL;
 	mc->videobox = NULL;
 	mc->sink = NULL;
-	mc->stopped = TRUE;
+	mc->started = FALSE;
 	moncell_set_accent(mc, ACCENT_GRAY);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 8);
@@ -341,7 +354,7 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	moncell_update_title(mc);
 	moncell_unlock(mc);
 	/* Stopping the stream will trigger a restart */
-	moncell_stop_stream(mc);
+	moncell_stop_stream(mc, 20);
 	return 1;
 }
 
