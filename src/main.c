@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define VERSION "0.2"
+#define VERSION "0.3"
 #define BANNER "monstream: v" VERSION "  Copyright (C)  MnDOT\n"
 
 uint32_t load_config(void);
