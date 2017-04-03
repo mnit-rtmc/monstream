@@ -283,6 +283,7 @@ static GtkWidget *create_label(int n_chars) {
 	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
 	if (n_chars)
 		gtk_label_set_max_width_chars(GTK_LABEL(lbl), n_chars);
+	gtk_label_set_ellipsize(GTK_LABEL(lbl), PANGO_ELLIPSIZE_END);
 	g_object_set(G_OBJECT(lbl), "single-line-mode", TRUE, NULL);
 	gtk_widget_override_font(lbl, pango_font_description_from_string(
 		"Cantarell Bold 32"));
