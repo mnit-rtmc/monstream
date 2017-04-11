@@ -29,6 +29,7 @@ struct moncell {
 	char		name[8];
 	char		mid[8];
 	char		accent[8];
+	gboolean	aspect;
 	GtkWidget	*box;
 	GtkWidget	*video;
 	GtkWidget	*title;
@@ -108,7 +109,7 @@ static GstElement *make_sink(struct moncell *mc) {
 	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, mc->handle);
-	g_object_set(G_OBJECT(sink), "force-aspect-ratio", FALSE, NULL);
+	g_object_set(G_OBJECT(sink), "force-aspect-ratio", mc->aspect, NULL);
 	return sink;
 }
 
@@ -299,6 +300,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, sizeof(mc->mid));
 	memset(mc->accent, 0, sizeof(mc->accent));
+	mc->aspect = FALSE;
 	memset(mc->location, 0, sizeof(mc->location));
 	memset(mc->description, 0, sizeof(mc->description));
 	memset(mc->stype, 0, sizeof(mc->stype));
@@ -360,13 +362,14 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 }
 
 static void moncell_set_id(struct moncell *mc, const char *mid,
-	const char *accent)
+	const char *accent, gboolean aspect)
 {
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	mc->accent[0] = '#';
 	strncpy(mc->accent + 1, accent, sizeof(mc->accent) - 1);
 	moncell_set_accent(mc, mc->accent);
 	moncell_update_title(mc);
+	mc->aspect = aspect;
 }
 
 struct mongrid {
@@ -452,10 +455,12 @@ int32_t mongrid_init(uint32_t num) {
 	return 0;
 }
 
-void mongrid_set_id(uint32_t idx, const char *mid, const char *accent) {
+void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
+	gboolean aspect)
+{
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		return moncell_set_id(mc, mid, accent);
+		return moncell_set_id(mc, mid, accent, aspect);
 	}
 }
 

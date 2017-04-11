@@ -28,7 +28,8 @@
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-void mongrid_set_id(uint32_t idx, const char *mid, const char *accent);
+void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
+	gboolean aspect);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype);
 
@@ -102,15 +103,18 @@ static void process_monitor(nstr_t cmd) {
 	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
 	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// monitor ID
 	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// accent color
+	nstr_t p5 = nstr_split(&str, UNIT_SEP); // force-aspect-ratio
 	assert(nstr_cmp_z(p1, "monitor"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
 		char mid[8];
 		char accent[8];
 		char fname[16];
+		int aspect;
 		nstr_wrap(mid, sizeof(mid), p3);
 		nstr_wrap(accent, sizeof(accent), p4);
-		mongrid_set_id(mon, mid, accent);
+		aspect = nstr_parse_u32(p5);
+		mongrid_set_id(mon, mid, accent, aspect);
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
 	} else
