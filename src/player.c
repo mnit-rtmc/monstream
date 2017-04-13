@@ -31,7 +31,9 @@ static const char UNIT_SEP = '\x1F';
 void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *stype);
+	const char *stype, uint32_t latency);
+
+#define DEFAULT_LATENCY	(50)
 
 nstr_t config_load(const char *name, nstr_t str);
 ssize_t config_store(const char *name, nstr_t cmd);
@@ -67,6 +69,11 @@ static int open_bind(const char *service) {
 	return -1;
 }
 
+static uint32_t parse_latency(nstr_t lat) {
+	int l = nstr_parse_u32(lat);
+	return (l > 0) ? l : DEFAULT_LATENCY;
+}
+
 static void process_play(nstr_t cmd) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "play"
@@ -75,6 +82,7 @@ static void process_play(nstr_t cmd) {
 	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// stream URI
 	nstr_t p5 = nstr_split(&str, UNIT_SEP);	// stream type
 	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// title
+	nstr_t p7 = nstr_split(&str, UNIT_SEP);	// latency
 	assert(nstr_cmp_z(p1, "play"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
@@ -90,7 +98,7 @@ static void process_play(nstr_t cmd) {
 		nstr_z(d);
 		nstr_wrap(uri, sizeof(uri), p4);
 		nstr_wrap(stype, sizeof(stype), p5);
-		mongrid_play_stream(mon, uri, desc, stype);
+		mongrid_play_stream(mon, uri, desc, stype, parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);
 	} else

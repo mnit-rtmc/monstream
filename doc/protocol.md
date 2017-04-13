@@ -26,6 +26,7 @@ Commands are separated by ASCII record separator (30).
 4. Stream request URI
 5. Stream type: "MPEG4", "H264", "PNG"
 6. Title: ASCII text description
+7. Latency (0-2000 ms)
 
 ## UDP response
 

@@ -39,6 +39,7 @@ struct moncell {
 	char		location[128];
 	char		description[64];
 	char		stype[8];
+	uint32_t	latency;
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*src;
@@ -52,6 +53,7 @@ struct moncell {
 };
 
 #define ACCENT_GRAY	"#444444"
+#define DEFAULT_LATENCY	(50)
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -65,6 +67,10 @@ static void moncell_set_description(struct moncell *mc, const char *desc) {
 
 static void moncell_set_stype(struct moncell *mc, const char *stype) {
 	strncpy(mc->stype, stype, sizeof(mc->stype));
+}
+
+static void moncell_set_latency(struct moncell *mc, uint32_t latency) {
+	mc->latency = latency;
 }
 
 static GstElement *make_src_blank(void) {
@@ -83,7 +89,7 @@ static void source_pad_added_cb(GstElement *src, GstPad *pad, gpointer data) {
 static GstElement *make_src_rtsp(struct moncell *mc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", mc->location, NULL);
-	g_object_set(G_OBJECT(src), "latency", 50, NULL);
+	g_object_set(G_OBJECT(src), "latency", mc->latency, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
@@ -304,6 +310,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	memset(mc->location, 0, sizeof(mc->location));
 	memset(mc->description, 0, sizeof(mc->description));
 	memset(mc->stype, 0, sizeof(mc->stype));
+	mc->latency = DEFAULT_LATENCY;
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
 	mc->title = create_title();
@@ -348,12 +355,13 @@ static void moncell_set_handle(struct moncell *mc) {
 }
 
 static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
-	const char *desc, const char *stype)
+	const char *desc, const char *stype, uint32_t latency)
 {
 	moncell_lock(mc);
 	moncell_set_location(mc, loc);
 	moncell_set_description(mc, desc);
 	moncell_set_stype(mc, stype);
+	moncell_set_latency(mc, latency);
 	moncell_update_title(mc);
 	moncell_unlock(mc);
 	/* Stopping the stream will trigger a restart */
@@ -465,11 +473,11 @@ void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
 }
 
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *stype)
+	const char *stype, uint32_t latency)
 {
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		return moncell_play_stream(mc, loc, desc, stype);
+		return moncell_play_stream(mc, loc, desc, stype, latency);
 	} else
 		return 1;
 }
