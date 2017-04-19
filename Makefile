@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -O2 -Wall -Wno-deprecated-declarations -Werror -flto `pkg-config --cflags gtk+-3.0 gstreamer-1.0 gstreamer-video-1.0`
-#CFLAGS = -Wall -ggdb
-LIBS = `pkg-config --libs gtk+-3.0 gstreamer-1.0 gstreamer-video-1.0`
+DEPS = gtk+-3.0 gstreamer-1.0 gstreamer-video-1.0
+CFLAGS = -O2 -Wall -Wno-deprecated-declarations -Werror -flto `pkg-config --cflags $(DEPS)`
+LIBS = `pkg-config --libs $(DEPS)`
 TARGET = monstream
 
 all:  $(TARGET)
