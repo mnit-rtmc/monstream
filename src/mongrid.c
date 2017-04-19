@@ -143,11 +143,8 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->sink = NULL;
 }
 
-static void moncell_set_accent(struct moncell *mc, const char *accent) {
-	GError *err = NULL;
-	char css[128];
-
-	snprintf(css, 128, "* { "
+static const char CSS_FORMAT[] =
+	"* { "
 		"color: #FFFFFF; "
 		"font-family: Cantarell; "
 		"font-size: 32pt; "
@@ -155,10 +152,16 @@ static void moncell_set_accent(struct moncell *mc, const char *accent) {
 	"}\n"
 	"box.title { "
 		"background-color: %s "
-	"}", accent);
+	"}";
+
+static void moncell_set_accent(struct moncell *mc, const char *accent) {
+	char css[sizeof(CSS_FORMAT) + 8];
+	GError *err = NULL;
+
+	snprintf(css, sizeof(css), CSS_FORMAT, accent);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
-		fprintf(stderr, "css error: %s\n", err->message);
+		fprintf(stderr, "CSS error: %s\n", err->message);
 }
 
 static void moncell_update_title(struct moncell *mc) {
