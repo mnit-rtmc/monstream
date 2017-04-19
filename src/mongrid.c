@@ -30,6 +30,7 @@ struct moncell {
 	char		mid[8];
 	char		accent[8];
 	gboolean	aspect;
+	GtkCssProvider	*css_provider;
 	GtkWidget	*box;
 	GtkWidget	*video;
 	GtkWidget	*title;
@@ -143,11 +144,21 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 }
 
 static void moncell_set_accent(struct moncell *mc, const char *accent) {
-	GdkRGBA rgba;
-	if (gdk_rgba_parse(&rgba, accent)) {
-		gtk_widget_override_background_color(mc->title,
-			GTK_STATE_FLAG_NORMAL, &rgba);
-	}
+	GError *err = NULL;
+	char css[128];
+
+	snprintf(css, 128, "* { "
+		"color: #FFFFFF; "
+		"font-family: Cantarell; "
+		"font-size: 32pt; "
+		"font-weight: Bold "
+	"}\n"
+	"box.title { "
+		"background-color: %s "
+	"}", accent);
+	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
+	if (err != NULL)
+		fprintf(stderr, "css error: %s\n", err->message);
 }
 
 static void moncell_update_title(struct moncell *mc) {
@@ -281,21 +292,19 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 }
 
 static GtkWidget *create_title(void) {
-	return gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+	GtkStyleContext *ctx = gtk_widget_get_style_context(box);
+	gtk_style_context_add_class(ctx, "title");
+	return box;
 }
 
 static GtkWidget *create_label(int n_chars) {
-	GdkRGBA rgba;
 	GtkWidget *lbl = gtk_label_new("");
 	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
 	if (n_chars)
 		gtk_label_set_max_width_chars(GTK_LABEL(lbl), n_chars);
 	gtk_label_set_ellipsize(GTK_LABEL(lbl), PANGO_ELLIPSIZE_END);
 	g_object_set(G_OBJECT(lbl), "single-line-mode", TRUE, NULL);
-	gtk_widget_override_font(lbl, pango_font_description_from_string(
-		"Cantarell Bold 32"));
-	gdk_rgba_parse(&rgba, "#FFFFFF");
-	gtk_widget_override_color(lbl, GTK_STATE_FLAG_NORMAL, &rgba);
 	return lbl;
 }
 
@@ -311,9 +320,14 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	memset(mc->description, 0, sizeof(mc->description));
 	memset(mc->stype, 0, sizeof(mc->stype));
 	mc->latency = DEFAULT_LATENCY;
+	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
 	mc->title = create_title();
+	GdkScreen *screen = gdk_screen_get_default();
+	gtk_style_context_add_provider_for_screen(screen,
+		GTK_STYLE_PROVIDER (mc->css_provider),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
 	mc->mon_lbl = create_label(6);
 	mc->cam_lbl = create_label(0);
 	mc->handle = 0;
