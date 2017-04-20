@@ -15,6 +15,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+#include "nstr.h"
 
 static void elog_now(void) {
 	char buf[32];
@@ -32,4 +33,11 @@ void elog_err(const char *format, ...) {
 	va_start(va, format);
 	vfprintf(stderr, format, va);
 	va_end(va);
+}
+
+void elog_cmd(nstr_t cmd) {
+	elog_now();
+	fprintf(stderr, "cmd: ");
+	fwrite(cmd.buf, cmd.len, 1, stderr);
+	fprintf(stderr, "\n");
 }

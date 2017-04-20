@@ -99,6 +99,7 @@ static void process_play(nstr_t cmd) {
 		nstr_z(d);
 		nstr_wrap(uri, sizeof(uri), p4);
 		nstr_wrap(stype, sizeof(stype), p5);
+		elog_cmd(cmd);
 		mongrid_play_stream(mon, uri, desc, stype, parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);
@@ -123,6 +124,7 @@ static void process_monitor(nstr_t cmd) {
 		nstr_wrap(mid, sizeof(mid), p3);
 		nstr_wrap(accent, sizeof(accent), p4);
 		aspect = nstr_parse_u32(p5);
+		elog_cmd(cmd);
 		mongrid_set_id(mon, mid, accent, aspect);
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
@@ -131,6 +133,7 @@ static void process_monitor(nstr_t cmd) {
 }
 
 static void process_config(nstr_t cmd) {
+	elog_cmd(cmd);
 	config_store("config", cmd);
 }
 
