@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>		/* for memset */
+#include "elog.h"
 #include "nstr.h"
 
 /* ASCII separators */
@@ -50,7 +51,7 @@ static int open_bind(const char *service) {
 	hints.ai_flags = AI_PASSIVE;
 	rc = getaddrinfo(NULL, service, &hints, &rai);
 	if (rc) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
 		return -1;
 	}
 
@@ -102,7 +103,7 @@ static void process_play(nstr_t cmd) {
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);
 	} else
-		fprintf(stderr, "Invalid monitor: %s\n", nstr_z(cmd));
+		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
 static void process_monitor(nstr_t cmd) {
@@ -126,7 +127,7 @@ static void process_monitor(nstr_t cmd) {
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
 	} else
-		fprintf(stderr, "Invalid monitor: %s\n", nstr_z(cmd));
+		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
 static void process_config(nstr_t cmd) {
@@ -143,7 +144,7 @@ static bool process_command(nstr_t cmd) {
 		process_config(cmd);
 		return false;
 	} else
-		fprintf(stderr, "Invalid command: %s\n", nstr_z(cmd));
+		elog_err("Invalid command: %s\n", nstr_z(cmd));
 	return true;
 }
 
@@ -177,7 +178,7 @@ static bool read_commands(int fd) {
 	ssize_t n = read(fd, buf, 1023);
 
 	if (n < 0) {
-		fprintf(stderr, "Read socket: %s\n", strerror(errno));
+		elog_err("Read socket: %s\n", strerror(errno));
 		return false;
 	}
 	return process_commands(nstr_make(buf, 1024, n));
@@ -209,7 +210,7 @@ uint32_t load_config(void) {
 			if (m > 0)
 				return m;
 		} else
-			fprintf(stderr, "Invalid command: %s\n", nstr_z(str));
+			elog_err("Invalid command: %s\n", nstr_z(str));
 	}
 	return 1;
 }

@@ -23,6 +23,7 @@
 #include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
+#include "elog.h"
 
 struct moncell {
 	pthread_mutex_t mutex;
@@ -161,7 +162,7 @@ static void moncell_set_accent(struct moncell *mc, const char *accent) {
 	snprintf(css, sizeof(css), CSS_FORMAT, accent);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
-		fprintf(stderr, "CSS error: %s\n", err->message);
+		elog_err("CSS error: %s\n", err->message);
 }
 
 static void moncell_update_title(struct moncell *mc) {
@@ -175,7 +176,7 @@ static void moncell_start_blank(struct moncell *mc) {
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->sink, NULL))
-		fprintf(stderr, "Unable to link elements\n");
+		elog_err("Unable to link elements\n");
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
@@ -191,7 +192,7 @@ static void moncell_start_png(struct moncell *mc) {
 		mc->convert, mc->freezer, mc->videobox, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->decoder, mc->convert,
 	                           mc->freezer, mc->videobox, mc->sink, NULL))
-		fprintf(stderr, "Unable to link elements\n");
+		elog_err("Unable to link elements\n");
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -216,7 +217,7 @@ static void moncell_start_pipeline(struct moncell *mc) {
 		mc->videobox, mc->sink, NULL);
 	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
 	                           mc->sink, NULL))
-		fprintf(stderr, "Unable to link elements\n");
+		elog_err("Unable to link elements\n");
 
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
@@ -224,13 +225,13 @@ static void moncell_start_pipeline(struct moncell *mc) {
 static void moncell_lock(struct moncell *mc) {
 	int rc = pthread_mutex_lock(&mc->mutex);
 	if (rc)
-		fprintf(stderr, "pthread_mutex_lock: %s\n", strerror(rc));
+		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
 }
 
 static void moncell_unlock(struct moncell *mc) {
 	int rc = pthread_mutex_unlock(&mc->mutex);
 	if (rc)
-		fprintf(stderr, "pthread_mutex_unlock: %s\n", strerror(rc));
+		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
 }
 
 static void moncell_restart_stream(struct moncell *mc) {
@@ -271,7 +272,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
-		fprintf(stderr, "End of stream: %s\n", mc->location);
+		elog_err("End of stream: %s\n", mc->location);
 		moncell_stop_stream(mc, 500);
 		break;
 	case GST_MESSAGE_ERROR: {
@@ -279,8 +280,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		GError *error;
 		gst_message_parse_error(msg, &error, &debug);
 		g_free(debug);
-		fprintf(stderr, "Error: %s  %s\n", error->message,
-			mc->location);
+		elog_err("Error: %s  %s\n", error->message, mc->location);
 		g_error_free(error);
 		moncell_stop_stream(mc, 500);
 		break;
@@ -314,7 +314,7 @@ static GtkWidget *create_label(int n_chars) {
 static void moncell_init(struct moncell *mc, uint32_t idx) {
 	int rc = pthread_mutex_init(&mc->mutex, NULL);
 	if (rc)
-		fprintf(stderr, "pthread_mutex_init: %s\n", strerror(rc));
+		elog_err("pthread_mutex_init: %s\n", strerror(rc));
 	snprintf(mc->name, 8, "m%d", idx);
 	memset(mc->mid, 0, sizeof(mc->mid));
 	memset(mc->accent, 0, sizeof(mc->accent));
@@ -364,7 +364,7 @@ static void moncell_destroy(struct moncell *mc) {
 	moncell_unlock(mc);
 	rc = pthread_mutex_destroy(&mc->mutex);
 	if (rc)
-		fprintf(stderr, "pthread_mutex_destroy: %s\n", strerror(rc));
+		elog_err("pthread_mutex_destroy: %s\n", strerror(rc));
 }
 
 static void moncell_set_handle(struct moncell *mc) {
@@ -446,7 +446,7 @@ int32_t mongrid_init(uint32_t num) {
 	if (num > 16) {
 		grid.rows = 0;
 		grid.cols = 0;
-		fprintf(stderr, "ERROR: Grid too large: %d\n", num);
+		elog_err("Grid too large: %d\n", num);
 		return 1;
 	}
 	grid.rows = get_rows(num);

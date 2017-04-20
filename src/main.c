@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "elog.h"
 
 #define VERSION "0.5"
 #define BANNER "monstream: v" VERSION "  Copyright (C)  MnDOT\n"
@@ -38,7 +39,7 @@ static bool do_main(void) {
 		return false;
 	rc = pthread_create(&thread, NULL, command_thread, &mon);
 	if (rc) {
-		fprintf(stderr, "pthread_create error: %d\n", rc);
+		elog_err("pthread_create: %d\n", rc);
 		goto fail;
 	}
 	gtk_main();
