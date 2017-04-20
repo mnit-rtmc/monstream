@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include "elog.h"
 
-#define VERSION "0.5"
+#define VERSION "0.6"
 #define BANNER "monstream: v" VERSION "  Copyright (C)  MnDOT\n"
 
 uint32_t load_config(void);
