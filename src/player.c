@@ -29,12 +29,13 @@
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
-	gboolean aspect);
+void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
+	gboolean aspect, uint32_t font_sz);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *stype, uint32_t latency);
 
 #define DEFAULT_LATENCY	(50)
+#define DEFAULT_FONT_SZ (32)
 
 nstr_t config_load(const char *name, nstr_t str);
 ssize_t config_store(const char *name, nstr_t cmd);
@@ -107,6 +108,11 @@ static void process_play(nstr_t cmd) {
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
+static uint32_t parse_font_sz(nstr_t fsz) {
+	int s = nstr_parse_u32(fsz);
+	return (s > 0) ? s : DEFAULT_FONT_SZ;
+}
+
 static void process_monitor(nstr_t cmd) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "monitor"
@@ -114,6 +120,7 @@ static void process_monitor(nstr_t cmd) {
 	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// monitor ID
 	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// accent color
 	nstr_t p5 = nstr_split(&str, UNIT_SEP); // force-aspect-ratio
+	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// font size
 	assert(nstr_cmp_z(p1, "monitor"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
@@ -125,7 +132,7 @@ static void process_monitor(nstr_t cmd) {
 		nstr_wrap(accent, sizeof(accent), p4);
 		aspect = nstr_parse_u32(p5);
 		elog_cmd(cmd);
-		mongrid_set_id(mon, mid, accent, aspect);
+		mongrid_set_mon(mon, mid, accent, aspect, parse_font_sz(p6));
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
 	} else

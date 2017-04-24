@@ -17,6 +17,7 @@ Commands are separated by ASCII record separator (30).
 3. Monitor ID
 4. Accent color (rgb hex: 000000 -> black)
 5. Force-aspect-ratio (0 or 1)
+6. Font size (pt)
 
 ### Play command
 

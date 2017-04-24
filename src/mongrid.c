@@ -31,6 +31,7 @@ struct moncell {
 	char		mid[8];
 	char		accent[8];
 	gboolean	aspect;
+	uint32_t	font_sz;
 	GtkCssProvider	*css_provider;
 	GtkWidget	*box;
 	GtkWidget	*video;
@@ -148,7 +149,7 @@ static const char CSS_FORMAT[] =
 	"* { "
 		"color: #FFFFFF; "
 		"font-family: Cantarell; "
-		"font-size: 32pt; "
+		"font-size: %upt; "
 		"font-weight: Bold "
 	"}\n"
 	"box.title { "
@@ -159,7 +160,7 @@ static void moncell_set_accent(struct moncell *mc, const char *accent) {
 	char css[sizeof(CSS_FORMAT) + 8];
 	GError *err = NULL;
 
-	snprintf(css, sizeof(css), CSS_FORMAT, accent);
+	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, accent);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
@@ -256,9 +257,9 @@ static void moncell_stop_stream(struct moncell *mc, guint delay) {
 	moncell_stop_pipeline(mc);
 	moncell_start_blank(mc);
 	mc->started = FALSE;
+	moncell_unlock(mc);
 	/* delay is needed to allow gtk+ to update accent color */
 	g_timeout_add(delay, do_restart, mc);
-	moncell_unlock(mc);
 }
 
 static void moncell_ack_started(struct moncell *mc) {
@@ -319,6 +320,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	memset(mc->mid, 0, sizeof(mc->mid));
 	memset(mc->accent, 0, sizeof(mc->accent));
 	mc->aspect = FALSE;
+	mc->font_sz = 32;
 	memset(mc->location, 0, sizeof(mc->location));
 	memset(mc->description, 0, sizeof(mc->description));
 	memset(mc->stype, 0, sizeof(mc->stype));
@@ -386,15 +388,18 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	return 1;
 }
 
-static void moncell_set_id(struct moncell *mc, const char *mid,
-	const char *accent, gboolean aspect)
+static void moncell_set_mon(struct moncell *mc, const char *mid,
+	const char *accent, gboolean aspect, uint32_t font_sz)
 {
+	moncell_lock(mc);
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	mc->accent[0] = '#';
 	strncpy(mc->accent + 1, accent, sizeof(mc->accent) - 1);
+	mc->aspect = aspect;
+	mc->font_sz = font_sz;
 	moncell_set_accent(mc, mc->accent);
 	moncell_update_title(mc);
-	mc->aspect = aspect;
+	moncell_unlock(mc);
 }
 
 struct mongrid {
@@ -480,12 +485,12 @@ int32_t mongrid_init(uint32_t num) {
 	return 0;
 }
 
-void mongrid_set_id(uint32_t idx, const char *mid, const char *accent,
-	gboolean aspect)
+void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
+	gboolean aspect, uint32_t font_sz)
 {
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		return moncell_set_id(mc, mid, accent, aspect);
+		return moncell_set_mon(mc, mid, accent, aspect, font_sz);
 	}
 }
 
