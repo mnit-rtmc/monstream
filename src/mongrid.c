@@ -55,7 +55,7 @@ struct moncell {
 	gboolean	started;
 };
 
-#define ACCENT_GRAY	"#444444"
+#define ACCENT_GRAY	"444444"
 #define DEFAULT_LATENCY	(50)
 
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
@@ -153,7 +153,7 @@ static const char CSS_FORMAT[] =
 		"font-weight: Bold "
 	"}\n"
 	"box.title { "
-		"background-color: %s "
+		"background-color: #%s "
 	"}";
 
 static void moncell_set_accent(struct moncell *mc, const char *accent) {
@@ -295,15 +295,22 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
-static GtkWidget *create_title(void) {
+static GtkWidget *create_title(struct moncell *mc) {
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 	GtkStyleContext *ctx = gtk_widget_get_style_context(box);
 	gtk_style_context_add_class(ctx, "title");
+	gtk_style_context_add_provider(ctx,
+		GTK_STYLE_PROVIDER (mc->css_provider),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
 	return box;
 }
 
-static GtkWidget *create_label(int n_chars) {
+static GtkWidget *create_label(struct moncell *mc, int n_chars) {
 	GtkWidget *lbl = gtk_label_new("");
+	GtkStyleContext *ctx = gtk_widget_get_style_context(lbl);
+	gtk_style_context_add_provider(ctx,
+		GTK_STYLE_PROVIDER (mc->css_provider),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
 	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
 	if (n_chars)
 		gtk_label_set_max_width_chars(GTK_LABEL(lbl), n_chars);
@@ -328,13 +335,9 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
-	mc->title = create_title();
-	GdkScreen *screen = gdk_screen_get_default();
-	gtk_style_context_add_provider_for_screen(screen,
-		GTK_STYLE_PROVIDER (mc->css_provider),
-		GTK_STYLE_PROVIDER_PRIORITY_USER);
-	mc->mon_lbl = create_label(6);
-	mc->cam_lbl = create_label(0);
+	mc->title = create_title(mc);
+	mc->mon_lbl = create_label(mc, 6);
+	mc->cam_lbl = create_label(mc, 0);
 	mc->handle = 0;
 	mc->pipeline = gst_pipeline_new(mc->name);
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
@@ -393,8 +396,7 @@ static void moncell_set_mon(struct moncell *mc, const char *mid,
 {
 	moncell_lock(mc);
 	strncpy(mc->mid, mid, sizeof(mc->mid));
-	mc->accent[0] = '#';
-	strncpy(mc->accent + 1, accent, sizeof(mc->accent) - 1);
+	strncpy(mc->accent, accent, sizeof(mc->accent));
 	mc->aspect = aspect;
 	mc->font_sz = font_sz;
 	moncell_set_accent(mc, mc->accent);
