@@ -95,8 +95,8 @@ static GstElement *make_src_rtsp(struct moncell *mc) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", mc->location, NULL);
 	g_object_set(G_OBJECT(src), "latency", mc->latency, NULL);
-	g_object_set(G_OBJECT(src), "timeout", 2000000, NULL);
-	g_object_set(G_OBJECT(src), "tcp-timeout", 2000000, NULL);
+	g_object_set(G_OBJECT(src), "timeout", 1000000, NULL);
+	g_object_set(G_OBJECT(src), "tcp-timeout", 1000000, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
