@@ -113,7 +113,9 @@ static GstElement *make_src_udp(struct moncell *mc) {
 
 static GstElement *make_filter(struct moncell *mc) {
 	GstElement *filter = gst_element_factory_make("capsfilter", NULL);
-	GstCaps *caps = gst_caps_new_empty_simple("application/x-rtp");
+	GstCaps *caps = gst_caps_new_simple("application/x-rtp",
+	                                    "clock-rate", G_TYPE_INT, 90000,
+	                                    NULL);
 	g_object_set(G_OBJECT(filter), "caps", caps, NULL);
 	gst_caps_unref(caps);
 	return filter;
