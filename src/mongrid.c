@@ -46,6 +46,8 @@ struct moncell {
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*src;
+	GstElement	*filter;
+	GstElement	*jitter;
 	GstElement	*depay;
 	GstElement	*decoder;
 	GstElement	*convert;
@@ -101,6 +103,30 @@ static GstElement *make_src_rtsp(struct moncell *mc) {
 	return src;
 }
 
+static GstElement *make_src_udp(struct moncell *mc) {
+	GstElement *src = gst_element_factory_make("udpsrc", NULL);
+	g_object_set(G_OBJECT(src), "uri", mc->location, NULL);
+	// Post GstUDPSrcTimeout messages after 1 second (ns)
+	g_object_set(G_OBJECT(src), "timeout", 1000000000, NULL);
+	return src;
+}
+
+static GstElement *make_filter(struct moncell *mc) {
+	GstElement *filter = gst_element_factory_make("capsfilter", NULL);
+	GstCaps *caps = gst_caps_new_empty_simple("application/x-rtp");
+	g_object_set(G_OBJECT(filter), "caps", caps, NULL);
+	gst_caps_unref(caps);
+	return filter;
+}
+
+static GstElement *make_jitter(struct moncell *mc) {
+	GstElement *jitter = gst_element_factory_make("rtpjitterbuffer", NULL);
+	g_object_set(G_OBJECT(jitter), "latency", mc->latency, NULL);
+	g_object_set(G_OBJECT(jitter), "drop-on-latency", TRUE, NULL);
+	g_object_set(G_OBJECT(jitter), "max-dropout-time", 1500, NULL);
+	return jitter;
+}
+
 static GstElement *make_src_http(struct moncell *mc) {
 	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", mc->location, NULL);
@@ -132,6 +158,8 @@ static void moncell_remove_element(struct moncell *mc, GstElement *elem) {
 static void moncell_stop_pipeline(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_NULL);
 	moncell_remove_element(mc, mc->src);
+	moncell_remove_element(mc, mc->filter);
+	moncell_remove_element(mc, mc->jitter);
 	moncell_remove_element(mc, mc->depay);
 	moncell_remove_element(mc, mc->decoder);
 	moncell_remove_element(mc, mc->convert);
@@ -139,6 +167,8 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	moncell_remove_element(mc, mc->videobox);
 	moncell_remove_element(mc, mc->sink);
 	mc->src = NULL;
+	mc->filter = NULL;
+	mc->jitter = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->convert = NULL;
@@ -200,12 +230,7 @@ static void moncell_start_png(struct moncell *mc) {
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
-static void moncell_start_pipeline(struct moncell *mc) {
-	if (strcmp("PNG", mc->stype) == 0) {
-		moncell_start_png(mc);
-		return;
-	}
-	mc->src = make_src_rtsp(mc);
+static void moncell_make_later_elements(struct moncell *mc) {
 	if (strcmp("H264", mc->stype) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
@@ -215,13 +240,40 @@ static void moncell_start_pipeline(struct moncell *mc) {
 	}
 	mc->videobox = make_videobox();
 	mc->sink = make_sink(mc);
+}
+
+static void moncell_make_udp_pipe(struct moncell *mc) {
+	mc->src = make_src_udp(mc);
+	mc->filter = make_filter(mc);
+	mc->jitter = make_jitter(mc);
+
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->filter, mc->jitter,
+			 mc->depay, mc->decoder, mc->videobox, mc->sink, NULL);
+	if (!gst_element_link_many(mc->src, mc->filter, mc->jitter, mc->depay,
+	                           mc->decoder, mc->videobox, mc->sink, NULL))
+		elog_err("Unable to link elements\n");
+}
+
+static void moncell_make_rtsp_pipe(struct moncell *mc) {
+	mc->src = make_src_rtsp(mc);
 
 	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->depay, mc->decoder,
 		mc->videobox, mc->sink, NULL);
 	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
 	                           mc->sink, NULL))
 		elog_err("Unable to link elements\n");
+}
 
+static void moncell_start_pipeline(struct moncell *mc) {
+	if (strcmp("PNG", mc->stype) == 0) {
+		moncell_start_png(mc);
+		return;
+	}
+	moncell_make_later_elements(mc);
+	if (strncmp("udp", mc->location, 3) == 0)
+		moncell_make_udp_pipe(mc);
+	else
+		moncell_make_rtsp_pipe(mc);
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
 }
 
@@ -288,6 +340,21 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		moncell_stop_stream(mc, 500);
 		break;
 	}
+	case GST_MESSAGE_WARNING: {
+		gchar *debug;
+		GError *error;
+		gst_message_parse_warning(msg, &error, &debug);
+		g_free(debug);
+		elog_err("Warning: %s  %s\n", error->message, mc->location);
+		g_error_free(error);
+		break;
+	}
+	case GST_MESSAGE_ELEMENT:
+		if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
+			elog_err("udpsrc timeout -- stopping stream\n");
+			moncell_stop_stream(mc, 500);
+		}
+		break;
 	case GST_MESSAGE_ASYNC_DONE:
 		moncell_ack_started(mc);
 		break;
@@ -345,6 +412,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->bus = gst_pipeline_get_bus(GST_PIPELINE(mc->pipeline));
 	gst_bus_add_watch(mc->bus, bus_cb, mc);
 	mc->src = NULL;
+	mc->filter = NULL;
+	mc->jitter = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->convert = NULL;
