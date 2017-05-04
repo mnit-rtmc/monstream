@@ -24,14 +24,6 @@
 static const uint32_t DEFAULT_LATENCY = 50;
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
-void stream_set_handle(struct stream *st, guintptr handle) {
-	st->handle = handle;
-}
-
-void stream_set_aspect(struct stream *st, gboolean aspect) {
-	st->aspect = aspect;
-}
-
 void stream_set_location(struct stream *st, const char *loc) {
 	strncpy(st->location, loc, sizeof(st->location));
 }
@@ -42,6 +34,14 @@ void stream_set_encoding(struct stream *st, const char *encoding) {
 
 void stream_set_latency(struct stream *st, uint32_t latency) {
 	st->latency = latency;
+}
+
+void stream_set_handle(struct stream *st, guintptr handle) {
+	st->handle = handle;
+}
+
+void stream_set_aspect(struct stream *st, gboolean aspect) {
+	st->aspect = aspect;
 }
 
 static GstElement *make_src_blank(void) {
@@ -154,16 +154,6 @@ void stream_stop_pipeline(struct stream *st) {
 	st->sink = NULL;
 }
 
-static void stream_stop(struct stream *st) {
-	if (st->stop)
-		st->stop(st);
-}
-
-static void stream_ack_started(struct stream *st) {
-	if (st->ack_started)
-		st->ack_started(st);
-}
-
 void stream_start_blank(struct stream *st) {
 	st->src = make_src_blank();
 	st->sink = make_sink(st);
@@ -261,6 +251,16 @@ void stream_start_pipeline(struct stream *st) {
 	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
 
+static void stream_stop(struct stream *st) {
+	if (st->stop)
+		st->stop(st);
+}
+
+static void stream_ack_started(struct stream *st) {
+	if (st->ack_started)
+		st->ack_started(st);
+}
+
 static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct stream *st = (struct stream *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
@@ -306,11 +306,11 @@ void stream_init(struct stream *st, uint32_t idx) {
 	char name[8];
 
 	snprintf(name, 8, "m%d", idx);
-	st->aspect = FALSE;
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	st->latency = DEFAULT_LATENCY;
 	st->handle = 0;
+	st->aspect = FALSE;
 	st->pipeline = gst_pipeline_new(name);
 	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
 	gst_bus_add_watch(st->bus, bus_cb, st);
