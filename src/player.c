@@ -32,7 +32,7 @@ static const char UNIT_SEP = '\x1F';
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *stype, uint32_t latency);
+	const char *encoding, uint32_t latency);
 
 #define DEFAULT_LATENCY	(50)
 #define DEFAULT_FONT_SZ (32)
@@ -90,7 +90,7 @@ static void process_play(nstr_t cmd) {
 	if (mon >= 0) {
 		char desc[128];
 		char uri[128];
-		char stype[16];
+		char encoding[16];
 		char fname[16];
 		nstr_t d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
 		if (nstr_len(p6)) {
@@ -99,9 +99,9 @@ static void process_play(nstr_t cmd) {
 		}
 		nstr_z(d);
 		nstr_wrap(uri, sizeof(uri), p4);
-		nstr_wrap(stype, sizeof(stype), p5);
+		nstr_wrap(encoding, sizeof(encoding), p5);
 		elog_cmd(cmd);
-		mongrid_play_stream(mon, uri, desc, stype, parse_latency(p7));
+		mongrid_play_stream(mon, uri, desc, encoding,parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);
 	} else

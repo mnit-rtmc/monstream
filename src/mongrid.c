@@ -41,7 +41,7 @@ struct moncell {
 	guintptr	handle;
 	char		location[128];
 	char		description[64];
-	char		stype[8];
+	char		encoding[8];
 	uint32_t	latency;
 	GstElement	*pipeline;
 	GstBus		*bus;
@@ -71,8 +71,8 @@ static void moncell_set_description(struct moncell *mc, const char *desc) {
 	strncpy(mc->description, desc, sizeof(mc->description));
 }
 
-static void moncell_set_stype(struct moncell *mc, const char *stype) {
-	strncpy(mc->stype, stype, sizeof(mc->stype));
+static void moncell_set_encoding(struct moncell *mc, const char *encoding) {
+	strncpy(mc->encoding, encoding, sizeof(mc->encoding));
 }
 
 static void moncell_set_latency(struct moncell *mc, uint32_t latency) {
@@ -243,10 +243,10 @@ static void moncell_start_png(struct moncell *mc) {
 }
 
 static void moncell_make_later_elements(struct moncell *mc) {
-	if (strcmp("H264", mc->stype) == 0) {
+	if (strcmp("H264", mc->encoding) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
-	} else if (strcmp("MPEG4", mc->stype) == 0) {
+	} else if (strcmp("MPEG4", mc->encoding) == 0) {
 		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
@@ -298,7 +298,7 @@ static void moncell_make_rtsp_pipe(struct moncell *mc) {
 }
 
 static void moncell_start_pipeline(struct moncell *mc) {
-	if (strcmp("PNG", mc->stype) == 0) {
+	if (strcmp("PNG", mc->encoding) == 0) {
 		moncell_start_png(mc);
 		return;
 	}
@@ -434,7 +434,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->font_sz = 32;
 	memset(mc->location, 0, sizeof(mc->location));
 	memset(mc->description, 0, sizeof(mc->description));
-	memset(mc->stype, 0, sizeof(mc->stype));
+	memset(mc->encoding, 0, sizeof(mc->encoding));
 	mc->latency = DEFAULT_LATENCY;
 	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -484,12 +484,12 @@ static void moncell_set_handle(struct moncell *mc) {
 }
 
 static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
-	const char *desc, const char *stype, uint32_t latency)
+	const char *desc, const char *encoding, uint32_t latency)
 {
 	moncell_lock(mc);
 	moncell_set_location(mc, loc);
 	moncell_set_description(mc, desc);
-	moncell_set_stype(mc, stype);
+	moncell_set_encoding(mc, encoding);
 	moncell_set_latency(mc, latency);
 	moncell_update_title(mc);
 	moncell_unlock(mc);
@@ -604,11 +604,11 @@ void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 }
 
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *stype, uint32_t latency)
+	const char *encoding, uint32_t latency)
 {
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		return moncell_play_stream(mc, loc, desc, stype, latency);
+		return moncell_play_stream(mc, loc, desc, encoding, latency);
 	} else
 		return 1;
 }
