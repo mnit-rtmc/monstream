@@ -48,6 +48,7 @@ struct moncell {
 	GstElement	*src;
 	GstElement	*filter;
 	GstElement	*jitter;
+	GstElement	*demux;
 	GstElement	*depay;
 	GstElement	*decoder;
 	GstElement	*convert;
@@ -101,6 +102,13 @@ static GstElement *make_src_rtsp(struct moncell *mc) {
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	g_signal_connect(src, "pad-added", G_CALLBACK(source_pad_added_cb), mc);
 	return src;
+}
+
+static GstElement *make_sdp_demux(struct moncell *mc) {
+	GstElement *sdp = gst_element_factory_make("sdpdemux", NULL);
+	g_object_set(G_OBJECT(sdp), "latency", mc->latency, NULL);
+	g_object_set(G_OBJECT(sdp), "timeout", 1000000, NULL);
+	return sdp;
 }
 
 static GstElement *make_src_udp(struct moncell *mc) {
@@ -162,6 +170,7 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	moncell_remove_element(mc, mc->src);
 	moncell_remove_element(mc, mc->filter);
 	moncell_remove_element(mc, mc->jitter);
+	moncell_remove_element(mc, mc->demux);
 	moncell_remove_element(mc, mc->depay);
 	moncell_remove_element(mc, mc->decoder);
 	moncell_remove_element(mc, mc->convert);
@@ -171,6 +180,7 @@ static void moncell_stop_pipeline(struct moncell *mc) {
 	mc->src = NULL;
 	mc->filter = NULL;
 	mc->jitter = NULL;
+	mc->demux = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->convert = NULL;
@@ -236,7 +246,7 @@ static void moncell_make_later_elements(struct moncell *mc) {
 	if (strcmp("H264", mc->stype) == 0) {
 		mc->depay = gst_element_factory_make("rtph264depay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_h264", NULL);
-	} else {
+	} else if (strcmp("MPEG4", mc->stype) == 0) {
 		mc->depay = gst_element_factory_make("rtpmp4vdepay", NULL);
 		mc->decoder = gst_element_factory_make("avdec_mpeg4", NULL);
 	}
@@ -253,6 +263,27 @@ static void moncell_make_udp_pipe(struct moncell *mc) {
 			 mc->depay, mc->decoder, mc->videobox, mc->sink, NULL);
 	if (!gst_element_link_many(mc->src, mc->filter, mc->jitter, mc->depay,
 	                           mc->decoder, mc->videobox, mc->sink, NULL))
+		elog_err("Unable to link elements\n");
+}
+
+static void demux_pad_added_cb(GstElement *demux, GstPad *pad, gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	GstPad *spad = gst_element_get_static_pad(mc->depay, "sink");
+	gst_pad_link(pad, spad);
+	gst_object_unref(spad);
+}
+
+static void moncell_make_http_pipe(struct moncell *mc) {
+	mc->src = make_src_http(mc);
+	mc->demux = make_sdp_demux(mc);
+	g_signal_connect(mc->demux, "pad-added", G_CALLBACK(demux_pad_added_cb),
+		mc);
+
+	gst_bin_add_many(GST_BIN(mc->pipeline), mc->src, mc->demux, mc->depay,
+		mc->decoder, mc->videobox, mc->sink, NULL);
+	gst_element_link(mc->src, mc->demux);
+	if (!gst_element_link_many(mc->depay, mc->decoder, mc->videobox,
+	                           mc->sink, NULL))
 		elog_err("Unable to link elements\n");
 }
 
@@ -274,6 +305,8 @@ static void moncell_start_pipeline(struct moncell *mc) {
 	moncell_make_later_elements(mc);
 	if (strncmp("udp", mc->location, 3) == 0)
 		moncell_make_udp_pipe(mc);
+	else if (strncmp("http", mc->location, 4) == 0)
+		moncell_make_http_pipe(mc);
 	else
 		moncell_make_rtsp_pipe(mc);
 	gst_element_set_state(mc->pipeline, GST_STATE_PLAYING);
@@ -416,6 +449,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->src = NULL;
 	mc->filter = NULL;
 	mc->jitter = NULL;
+	mc->demux = NULL;
 	mc->depay = NULL;
 	mc->decoder = NULL;
 	mc->convert = NULL;
