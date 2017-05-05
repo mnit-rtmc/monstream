@@ -94,6 +94,10 @@ static void stream_add_filter(struct stream *st) {
 	GstCaps *caps = gst_caps_new_simple("application/x-rtp",
 	                                    "clock-rate", G_TYPE_INT, 90000,
 	                                    NULL);
+	if (strcmp("MPEG2", st->encoding) == 0) {
+		gst_caps_append_structure(caps, gst_structure_new("ename",
+			"encoding-name", G_TYPE_STRING, "MP2T", NULL));
+	}
 	g_object_set(G_OBJECT(fltr), "caps", caps, NULL);
 	gst_caps_unref(caps);
 	stream_add(st, fltr);
@@ -147,12 +151,16 @@ void stream_start_blank(struct stream *st) {
 static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
 	stream_add_videobox(st);
-	if (strcmp("H264", st->encoding) == 0) {
-		stream_add(st, gst_element_factory_make("avdec_h264", NULL));
-		stream_add(st, gst_element_factory_make("rtph264depay", NULL));
+	if (strcmp("MPEG2", st->encoding) == 0) {
+		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
+		stream_add(st, gst_element_factory_make("tsdemux", NULL));
+		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("avdec_mpeg4", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
+	} else if (strcmp("H264", st->encoding) == 0) {
+		stream_add(st, gst_element_factory_make("avdec_h264", NULL));
+		stream_add(st, gst_element_factory_make("rtph264depay", NULL));
 	}
 }
 
