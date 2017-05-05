@@ -161,14 +161,12 @@ static void stream_add_later_elements(struct stream *st) {
 	} else if (strcmp("H264", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("avdec_h264", NULL));
 		stream_add(st, gst_element_factory_make("rtph264depay", NULL));
-	}
-}
-
-static void stream_add_png_pipe(struct stream *st) {
-	stream_add(st, gst_element_factory_make("imagefreeze", NULL));
-	stream_add(st, gst_element_factory_make("videoconvert", NULL));
-	stream_add(st, gst_element_factory_make("pngdec", NULL));
-	stream_add_src_http(st);
+	} else if (strcmp("PNG", st->encoding) == 0) {
+		stream_add(st, gst_element_factory_make("imagefreeze", NULL));
+		stream_add(st, gst_element_factory_make("videoconvert", NULL));
+		stream_add(st, gst_element_factory_make("pngdec", NULL));
+	} else
+		elog_err("Invalid encoding: %s\n", st->encoding);
 }
 
 static void stream_add_udp_pipe(struct stream *st) {
@@ -178,7 +176,8 @@ static void stream_add_udp_pipe(struct stream *st) {
 }
 
 static void stream_add_http_pipe(struct stream *st) {
-	stream_add_sdp_demux(st);
+	if (strcmp("PNG", st->encoding) != 0)
+		stream_add_sdp_demux(st);
 	stream_add_src_http(st);
 }
 
@@ -188,15 +187,16 @@ static void stream_add_rtsp_pipe(struct stream *st) {
 
 void stream_start_pipeline(struct stream *st) {
 	stream_add_later_elements(st);
-	if (strcmp("PNG", st->encoding) == 0)
-		stream_add_png_pipe(st);
-	else if (strncmp("udp", st->location, 3) == 0)
+	if (strncmp("udp", st->location, 3) == 0)
 		stream_add_udp_pipe(st);
 	else if (strncmp("http", st->location, 4) == 0)
 		stream_add_http_pipe(st);
-	else
+	else if (strncmp("rtsp", st->location, 4) == 0)
 		stream_add_rtsp_pipe(st);
-
+	else {
+		elog_err("Invalid location: %s\n", st->location);
+		return;
+	}
 	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
 
