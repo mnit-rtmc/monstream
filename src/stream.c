@@ -89,15 +89,28 @@ static void stream_add_jitter(struct stream *st) {
 	stream_add(st, jtr);
 }
 
+static GstCaps *create_caps_mpeg2(void) {
+	return gst_caps_new_simple("application/x-rtp",
+	                           "clock-rate", G_TYPE_INT, 90000,
+	                           "encoding-name", G_TYPE_STRING, "MP2T",
+	                           NULL);
+}
+
+static GstCaps *create_caps_generic(void) {
+	return gst_caps_new_simple("application/x-rtp",
+	                           "clock-rate", G_TYPE_INT, 90000,
+	                           NULL);
+}
+
+static GstCaps *stream_create_caps(struct stream *st) {
+	return (strcmp("MPEG2", st->encoding) == 0)
+	      ?	create_caps_mpeg2()
+	      : create_caps_generic();
+}
+
 static void stream_add_filter(struct stream *st) {
 	GstElement *fltr = gst_element_factory_make("capsfilter", NULL);
-	GstCaps *caps = gst_caps_new_simple("application/x-rtp",
-	                                    "clock-rate", G_TYPE_INT, 90000,
-	                                    NULL);
-	if (strcmp("MPEG2", st->encoding) == 0) {
-		gst_caps_append_structure(caps, gst_structure_new("ename",
-			"encoding-name", G_TYPE_STRING, "MP2T", NULL));
-	}
+	GstCaps *caps = stream_create_caps(st);
 	g_object_set(G_OBJECT(fltr), "caps", caps, NULL);
 	gst_caps_unref(caps);
 	stream_add(st, fltr);
