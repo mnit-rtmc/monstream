@@ -81,6 +81,12 @@ static void stream_add_videobox(struct stream *st) {
 	stream_add(st, vbx);
 }
 
+static void stream_add_queue(struct stream *st) {
+	GstElement *que = gst_element_factory_make("queue", NULL);
+	g_object_set(G_OBJECT(que), "max-size-time", 650000000, NULL);
+	stream_add(st, que);
+}
+
 static void stream_add_jitter(struct stream *st) {
 	GstElement *jtr = gst_element_factory_make("rtpjitterbuffer", NULL);
 	g_object_set(G_OBJECT(jtr), "latency", st->latency, NULL);
@@ -168,6 +174,7 @@ static void stream_add_later_elements(struct stream *st) {
 		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
 		stream_add(st, gst_element_factory_make("tsdemux", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
+		stream_add_queue(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("avdec_mpeg4", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
