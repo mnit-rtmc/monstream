@@ -21,6 +21,10 @@
 #include "elog.h"
 #include "stream.h"
 
+#define ONE_SEC_US	(1000000)
+#define TEN_SEC_US	(10000000)
+#define ONE_SEC_NS	(1000000000)
+
 static const uint32_t DEFAULT_LATENCY = 50;
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -125,7 +129,7 @@ static void stream_add_filter(struct stream *st) {
 static void stream_add_sdp_demux(struct stream *st) {
 	GstElement *sdp = gst_element_factory_make("sdpdemux", NULL);
 	g_object_set(G_OBJECT(sdp), "latency", st->latency, NULL);
-	g_object_set(G_OBJECT(sdp), "timeout", 1000000, NULL);
+	g_object_set(G_OBJECT(sdp), "timeout", ONE_SEC_US, NULL);
 	stream_add(st, sdp);
 }
 
@@ -139,7 +143,7 @@ static void stream_add_src_udp(struct stream *st) {
 	GstElement *src = gst_element_factory_make("udpsrc", NULL);
 	g_object_set(G_OBJECT(src), "uri", st->location, NULL);
 	// Post GstUDPSrcTimeout messages after 1 second (ns)
-	g_object_set(G_OBJECT(src), "timeout", 1000000000, NULL);
+	g_object_set(G_OBJECT(src), "timeout", ONE_SEC_NS, NULL);
 	stream_add(st, src);
 }
 
@@ -153,8 +157,8 @@ static void stream_add_src_rtsp(struct stream *st) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", st->location, NULL);
 	g_object_set(G_OBJECT(src), "latency", st->latency, NULL);
-	g_object_set(G_OBJECT(src), "timeout", 1000000, NULL);
-	g_object_set(G_OBJECT(src), "tcp-timeout", 10000000, NULL);
+	g_object_set(G_OBJECT(src), "timeout", ONE_SEC_US, NULL);
+	g_object_set(G_OBJECT(src), "tcp-timeout", TEN_SEC_US, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	stream_add(st, src);
