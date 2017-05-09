@@ -154,7 +154,7 @@ static void stream_add_src_rtsp(struct stream *st) {
 	g_object_set(G_OBJECT(src), "location", st->location, NULL);
 	g_object_set(G_OBJECT(src), "latency", st->latency, NULL);
 	g_object_set(G_OBJECT(src), "timeout", 1000000, NULL);
-	g_object_set(G_OBJECT(src), "tcp-timeout", 1000000, NULL);
+	g_object_set(G_OBJECT(src), "tcp-timeout", 10000000, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
 	stream_add(st, src);
