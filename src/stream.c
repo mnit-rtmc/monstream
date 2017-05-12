@@ -25,6 +25,8 @@
 #define TEN_SEC_US	(10000000)
 #define ONE_SEC_NS	(1000000000)
 
+#define STREAM_NUM_VIDEO	(0)
+
 static const uint32_t DEFAULT_LATENCY = 50;
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
@@ -153,6 +155,17 @@ static void stream_add_src_http(struct stream *st) {
 	stream_add(st, src);
 }
 
+static gboolean select_stream_cb(GstElement *src, guint num, GstCaps *caps,
+	gpointer user_data)
+{
+	switch (num) {
+	case STREAM_NUM_VIDEO:
+		return TRUE;
+	default:
+		return FALSE;
+	}
+}
+
 static void stream_add_src_rtsp(struct stream *st) {
 	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", st->location, NULL);
@@ -161,6 +174,7 @@ static void stream_add_src_rtsp(struct stream *st) {
 	g_object_set(G_OBJECT(src), "tcp-timeout", TEN_SEC_US, NULL);
 	g_object_set(G_OBJECT(src), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(src), "do-retransmission", FALSE, NULL);
+	g_signal_connect(src, "select-stream", G_CALLBACK(select_stream_cb),st);
 	stream_add(st, src);
 }
 
