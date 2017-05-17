@@ -213,6 +213,28 @@ static void stream_add_rtsp_pipe(struct stream *st) {
 	stream_add_src_rtsp(st);
 }
 
+static void stream_start_pipeline(struct stream *st) {
+	stream_add_later_elements(st);
+	if (strncmp("udp", st->location, 3) == 0)
+		stream_add_udp_pipe(st);
+	else if (strncmp("http", st->location, 4) == 0)
+		stream_add_http_pipe(st);
+	else if (strncmp("rtsp", st->location, 4) == 0)
+		stream_add_rtsp_pipe(st);
+	else {
+		elog_err("Invalid location: %s\n", st->location);
+		return;
+	}
+	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
+}
+
+static void stream_start_blank(struct stream *st) {
+	stream_add_sink(st);
+	stream_add_src_blank(st);
+
+	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
+}
+
 static void stream_remove_all(struct stream *st) {
 	GstBin *bin = GST_BIN(st->pipeline);
 	for (int i = 0; i < MAX_ELEMS; i++) {
@@ -222,9 +244,14 @@ static void stream_remove_all(struct stream *st) {
 	memset(st->elem, 0, sizeof(st->elem));
 }
 
-static void stream_stop(struct stream *st) {
-	if (st->stop)
-		st->stop(st);
+static void stream_stop_pipeline(struct stream *st) {
+	gst_element_set_state(st->pipeline, GST_STATE_NULL);
+	stream_remove_all(st);
+}
+
+static void stream_do_stop(struct stream *st) {
+	if (st->do_stop)
+		st->do_stop(st);
 }
 
 static void stream_ack_started(struct stream *st) {
@@ -237,7 +264,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
 		elog_err("End of stream: %s\n", st->location);
-		stream_stop(st);
+		stream_do_stop(st);
 		break;
 	case GST_MESSAGE_ERROR: {
 		gchar *debug;
@@ -246,7 +273,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 		g_free(debug);
 		elog_err("Error: %s  %s\n", error->message, st->location);
 		g_error_free(error);
-		stream_stop(st);
+		stream_do_stop(st);
 		break;
 	}
 	case GST_MESSAGE_WARNING: {
@@ -261,7 +288,7 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	case GST_MESSAGE_ELEMENT:
 		if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
 			elog_err("udpsrc timeout -- stopping stream\n");
-			stream_stop(st);
+			stream_do_stop(st);
 		}
 		break;
 	case GST_MESSAGE_ASYNC_DONE:
@@ -289,7 +316,7 @@ void stream_init(struct stream *st, uint32_t idx) {
 	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
 	gst_bus_add_watch(st->bus, bus_cb, st);
 	memset(st->elem, 0, sizeof(st->elem));
-	st->stop = NULL;
+	st->do_stop = NULL;
 	st->ack_started = NULL;
 }
 
@@ -339,29 +366,13 @@ void stream_set_latency(struct stream *st, uint32_t latency) {
 	st->latency = latency;
 }
 
-void stream_start_pipeline(struct stream *st) {
-	stream_add_later_elements(st);
-	if (strncmp("udp", st->location, 3) == 0)
-		stream_add_udp_pipe(st);
-	else if (strncmp("http", st->location, 4) == 0)
-		stream_add_http_pipe(st);
-	else if (strncmp("rtsp", st->location, 4) == 0)
-		stream_add_rtsp_pipe(st);
-	else {
-		elog_err("Invalid location: %s\n", st->location);
-		return;
-	}
-	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
+void stream_start(struct stream *st) {
+	/* Blank pipeline is probably running -- stop it first */
+	stream_stop_pipeline(st);
+	stream_start_pipeline(st);
 }
 
-void stream_stop_pipeline(struct stream *st) {
-	gst_element_set_state(st->pipeline, GST_STATE_NULL);
-	stream_remove_all(st);
-}
-
-void stream_start_blank(struct stream *st) {
-	stream_add_sink(st);
-	stream_add_src_blank(st);
-
-	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
+void stream_stop(struct stream *st) {
+	stream_stop_pipeline(st);
+	stream_start_blank(st);
 }

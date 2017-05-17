@@ -18,7 +18,7 @@ struct stream {
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*elem[MAX_ELEMS];
-	void		(*stop)		(struct stream *st);
+	void		(*do_stop)	(struct stream *st);
 	void		(*ack_started)	(struct stream *st);
 };
 
@@ -31,8 +31,7 @@ void stream_set_aspect(struct stream *st, gboolean aspect);
 void stream_set_location(struct stream *st, const char *loc);
 void stream_set_encoding(struct stream *st, const char *encoding);
 void stream_set_latency(struct stream *st, uint32_t latency);
-void stream_start_pipeline(struct stream *st);
-void stream_stop_pipeline(struct stream *st);
-void stream_start_blank(struct stream *st);
+void stream_start(struct stream *st);
+void stream_stop(struct stream *st);
 
 #endif
