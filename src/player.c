@@ -82,7 +82,7 @@ static void process_play(nstr_t cmd) {
 	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
 	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// camera ID
 	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// stream URI
-	nstr_t p5 = nstr_split(&str, UNIT_SEP);	// stream type
+	nstr_t p5 = nstr_split(&str, UNIT_SEP);	// encoding
 	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// title
 	nstr_t p7 = nstr_split(&str, UNIT_SEP);	// latency
 	assert(nstr_cmp_z(p1, "play"));
@@ -92,14 +92,19 @@ static void process_play(nstr_t cmd) {
 		char uri[128];
 		char encoding[16];
 		char fname[16];
-		nstr_t d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
+		nstr_t d;
+
+		nstr_wrap(uri, sizeof(uri), p4);
+		nstr_wrap(encoding, sizeof(encoding), p5);
+		d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
 		if (nstr_len(p6)) {
-			nstr_cat_z(&d, " | ");
+			if (strncmp("udp", uri, 3) == 0)
+				nstr_cat_z(&d, " * ");
+			else
+				nstr_cat_z(&d, " | ");
 			nstr_cat(&d, p6);
 		}
 		nstr_z(d);
-		nstr_wrap(uri, sizeof(uri), p4);
-		nstr_wrap(encoding, sizeof(encoding), p5);
 		elog_cmd(cmd);
 		mongrid_play_stream(mon, uri, desc, encoding,parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
