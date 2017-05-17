@@ -259,37 +259,61 @@ static void stream_ack_started(struct stream *st) {
 		st->ack_started(st);
 }
 
+static void stream_msg_eos(struct stream *st) {
+	stream_lock(st);
+	elog_err("End of stream: %s\n", st->location);
+	stream_do_stop(st);
+	stream_unlock(st);
+}
+
+static void stream_msg_error(struct stream *st, GstMessage *msg) {
+	GError *error;
+	gchar *debug;
+
+	gst_message_parse_error(msg, &error, &debug);
+	g_free(debug);
+	stream_lock(st);
+	elog_err("Error: %s  %s\n", error->message, st->location);
+	stream_do_stop(st);
+	stream_unlock(st);
+	g_error_free(error);
+}
+
+static void stream_msg_warning(struct stream *st, GstMessage *msg) {
+	GError *warning;
+	gchar *debug;
+
+	gst_message_parse_warning(msg, &warning, &debug);
+	g_free(debug);
+	stream_lock(st);
+	elog_err("Warning: %s  %s\n", warning->message, st->location);
+	stream_unlock(st);
+	g_error_free(warning);
+}
+
+static void stream_msg_element(struct stream *st, GstMessage *msg) {
+	if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
+		elog_err("udpsrc timeout -- stopping stream\n");
+		stream_lock(st);
+		stream_do_stop(st);
+		stream_unlock(st);
+	}
+}
+
 static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	struct stream *st = (struct stream *) data;
 	switch (GST_MESSAGE_TYPE(msg)) {
 	case GST_MESSAGE_EOS:
-		elog_err("End of stream: %s\n", st->location);
-		stream_do_stop(st);
+		stream_msg_eos(st);
 		break;
-	case GST_MESSAGE_ERROR: {
-		gchar *debug;
-		GError *error;
-		gst_message_parse_error(msg, &error, &debug);
-		g_free(debug);
-		elog_err("Error: %s  %s\n", error->message, st->location);
-		g_error_free(error);
-		stream_do_stop(st);
+	case GST_MESSAGE_ERROR:
+		stream_msg_error(st, msg);
 		break;
-	}
-	case GST_MESSAGE_WARNING: {
-		gchar *debug;
-		GError *error;
-		gst_message_parse_warning(msg, &error, &debug);
-		g_free(debug);
-		elog_err("Warning: %s  %s\n", error->message, st->location);
-		g_error_free(error);
+	case GST_MESSAGE_WARNING:
+		stream_msg_warning(st, msg);
 		break;
-	}
 	case GST_MESSAGE_ELEMENT:
-		if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
-			elog_err("udpsrc timeout -- stopping stream\n");
-			stream_do_stop(st);
-		}
+		stream_msg_element(st, msg);
 		break;
 	case GST_MESSAGE_ASYNC_DONE:
 		stream_ack_started(st);
