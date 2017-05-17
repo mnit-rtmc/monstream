@@ -42,10 +42,15 @@ static int stream_elem_next(const struct stream *st) {
 static void pad_added_cb(GstElement *src, GstPad *pad, gpointer data) {
 	GstElement *sink = (GstElement *) data;
 	GstPad *p = gst_element_get_static_pad(sink, "sink");
-	GstPadLinkReturn ret = gst_pad_link(pad, p);
-	if (ret != GST_PAD_LINK_OK)
-		elog_err("Pad link error: %s\n", gst_pad_link_get_name(ret));
-	gst_object_unref(p);
+	if (p) {
+		GstPadLinkReturn ret = gst_pad_link(pad, p);
+		if (ret != GST_PAD_LINK_OK) {
+			elog_err("Pad link error: %s\n",
+				gst_pad_link_get_name(ret));
+		}
+		gst_object_unref(p);
+	} else
+		elog_err("Sink pad not found\n");
 }
 
 static void stream_link(struct stream *st, int i) {
