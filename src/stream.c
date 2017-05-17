@@ -255,8 +255,11 @@ static void stream_do_stop(struct stream *st) {
 }
 
 static void stream_ack_started(struct stream *st) {
-	if (st->ack_started)
+	if (st->ack_started) {
+		stream_lock(st);
 		st->ack_started(st);
+		stream_unlock(st);
+	}
 }
 
 static void stream_msg_eos(struct stream *st) {
