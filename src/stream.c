@@ -175,13 +175,6 @@ static void stream_add_src_rtsp(struct stream *st) {
 	stream_add(st, src);
 }
 
-void stream_start_blank(struct stream *st) {
-	stream_add_sink(st);
-	stream_add_src_blank(st);
-
-	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
-}
-
 static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
 	stream_add_videobox(st);
@@ -220,21 +213,6 @@ static void stream_add_rtsp_pipe(struct stream *st) {
 	stream_add_src_rtsp(st);
 }
 
-void stream_start_pipeline(struct stream *st) {
-	stream_add_later_elements(st);
-	if (strncmp("udp", st->location, 3) == 0)
-		stream_add_udp_pipe(st);
-	else if (strncmp("http", st->location, 4) == 0)
-		stream_add_http_pipe(st);
-	else if (strncmp("rtsp", st->location, 4) == 0)
-		stream_add_rtsp_pipe(st);
-	else {
-		elog_err("Invalid location: %s\n", st->location);
-		return;
-	}
-	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
-}
-
 static void stream_remove_all(struct stream *st) {
 	GstBin *bin = GST_BIN(st->pipeline);
 	for (int i = 0; i < MAX_ELEMS; i++) {
@@ -242,11 +220,6 @@ static void stream_remove_all(struct stream *st) {
 			gst_bin_remove(bin, st->elem[i]);
 	}
 	memset(st->elem, 0, sizeof(st->elem));
-}
-
-void stream_stop_pipeline(struct stream *st) {
-	gst_element_set_state(st->pipeline, GST_STATE_NULL);
-	stream_remove_all(st);
 }
 
 static void stream_stop(struct stream *st) {
@@ -334,6 +307,26 @@ void stream_destroy(struct stream *st) {
 		elog_err("pthread_mutex_destroy: %s\n", strerror(rc));
 }
 
+void stream_lock(struct stream *st) {
+	int rc = pthread_mutex_lock(&st->mutex);
+	if (rc)
+		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
+}
+
+void stream_unlock(struct stream *st) {
+	int rc = pthread_mutex_unlock(&st->mutex);
+	if (rc)
+		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
+}
+
+void stream_set_handle(struct stream *st, guintptr handle) {
+	st->handle = handle;
+}
+
+void stream_set_aspect(struct stream *st, gboolean aspect) {
+	st->aspect = aspect;
+}
+
 void stream_set_location(struct stream *st, const char *loc) {
 	strncpy(st->location, loc, sizeof(st->location));
 }
@@ -346,22 +339,29 @@ void stream_set_latency(struct stream *st, uint32_t latency) {
 	st->latency = latency;
 }
 
-void stream_set_handle(struct stream *st, guintptr handle) {
-	st->handle = handle;
+void stream_start_pipeline(struct stream *st) {
+	stream_add_later_elements(st);
+	if (strncmp("udp", st->location, 3) == 0)
+		stream_add_udp_pipe(st);
+	else if (strncmp("http", st->location, 4) == 0)
+		stream_add_http_pipe(st);
+	else if (strncmp("rtsp", st->location, 4) == 0)
+		stream_add_rtsp_pipe(st);
+	else {
+		elog_err("Invalid location: %s\n", st->location);
+		return;
+	}
+	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
 
-void stream_set_aspect(struct stream *st, gboolean aspect) {
-	st->aspect = aspect;
+void stream_stop_pipeline(struct stream *st) {
+	gst_element_set_state(st->pipeline, GST_STATE_NULL);
+	stream_remove_all(st);
 }
 
-void stream_lock(struct stream *st) {
-	int rc = pthread_mutex_lock(&st->mutex);
-	if (rc)
-		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
-}
+void stream_start_blank(struct stream *st) {
+	stream_add_sink(st);
+	stream_add_src_blank(st);
 
-void stream_unlock(struct stream *st) {
-	int rc = pthread_mutex_unlock(&st->mutex);
-	if (rc)
-		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
+	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
