@@ -12,7 +12,6 @@
  * GNU General Public License for more details.
  */
 
-#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +27,6 @@
 
 struct moncell {
 	struct stream	stream;	/* must be first member, due to casting */
-	pthread_mutex_t mutex;
 	char		mid[8];
 	char		accent[8];
 	char		description[64];
@@ -74,26 +72,14 @@ static void moncell_update_title(struct moncell *mc) {
 	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->description);
 }
 
-static void moncell_lock(struct moncell *mc) {
-	int rc = pthread_mutex_lock(&mc->mutex);
-	if (rc)
-		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
-}
-
-static void moncell_unlock(struct moncell *mc) {
-	int rc = pthread_mutex_unlock(&mc->mutex);
-	if (rc)
-		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
-}
-
 static void moncell_restart_stream(struct moncell *mc) {
-	moncell_lock(mc);
+	stream_lock(&mc->stream);
 	if (!mc->started) {
 		stream_stop_pipeline(&mc->stream);
 		stream_start_pipeline(&mc->stream);
 		mc->started = TRUE;
 	}
-	moncell_unlock(mc);
+	stream_unlock(&mc->stream);
 }
 
 static gboolean do_restart(gpointer data) {
@@ -103,12 +89,12 @@ static gboolean do_restart(gpointer data) {
 }
 
 static void moncell_stop_stream(struct moncell *mc, guint delay) {
-	moncell_lock(mc);
+	stream_lock(&mc->stream);
 	moncell_set_accent(mc, ACCENT_GRAY);
 	stream_stop_pipeline(&mc->stream);
 	stream_start_blank(&mc->stream);
 	mc->started = FALSE;
-	moncell_unlock(mc);
+	stream_unlock(&mc->stream);
 	/* delay is needed to allow gtk+ to update accent color */
 	g_timeout_add(delay, do_restart, mc);
 }
@@ -122,10 +108,10 @@ static void moncell_stop(struct stream *st) {
 static void moncell_ack_started(struct stream *st) {
 	/* Cast requires stream is first member of struct */
 	struct moncell *mc = (struct moncell *) st;
-	moncell_lock(mc);
+	stream_lock(&mc->stream);
 	if (mc->started)
 		moncell_set_accent(mc, mc->accent);
-	moncell_unlock(mc);
+	stream_unlock(&mc->stream);
 }
 
 static GtkWidget *create_title(struct moncell *mc) {
@@ -153,9 +139,6 @@ static GtkWidget *create_label(struct moncell *mc, int n_chars) {
 }
 
 static void moncell_init(struct moncell *mc, uint32_t idx) {
-	int rc = pthread_mutex_init(&mc->mutex, NULL);
-	if (rc)
-		elog_err("pthread_mutex_init: %s\n", strerror(rc));
 	stream_init(&mc->stream, idx);
 	mc->stream.stop = moncell_stop;
 	mc->stream.ack_started = moncell_ack_started;
@@ -180,14 +163,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 }
 
 static void moncell_destroy(struct moncell *mc) {
-	int rc;
-
-	moncell_lock(mc);
 	stream_destroy(&mc->stream);
-	moncell_unlock(mc);
-	rc = pthread_mutex_destroy(&mc->mutex);
-	if (rc)
-		elog_err("pthread_mutex_destroy: %s\n", strerror(rc));
 }
 
 static void moncell_set_handle(struct moncell *mc) {
@@ -198,13 +174,13 @@ static void moncell_set_handle(struct moncell *mc) {
 static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency)
 {
-	moncell_lock(mc);
+	stream_lock(&mc->stream);
 	stream_set_location(&mc->stream, loc);
 	stream_set_encoding(&mc->stream, encoding);
 	stream_set_latency(&mc->stream, latency);
 	moncell_set_description(mc, desc);
 	moncell_update_title(mc);
-	moncell_unlock(mc);
+	stream_unlock(&mc->stream);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 	return 1;
@@ -213,14 +189,14 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 static void moncell_set_mon(struct moncell *mc, const char *mid,
 	const char *accent, gboolean aspect, uint32_t font_sz)
 {
-	moncell_lock(mc);
+	stream_lock(&mc->stream);
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	strncpy(mc->accent, accent, sizeof(mc->accent));
 	stream_set_aspect(&mc->stream, aspect);
 	mc->font_sz = font_sz;
 	moncell_set_accent(mc, mc->accent);
 	moncell_update_title(mc);
-	moncell_unlock(mc);
+	stream_unlock(&mc->stream);
 }
 
 struct mongrid {

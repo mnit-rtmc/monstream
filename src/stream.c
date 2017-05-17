@@ -12,10 +12,7 @@
  * GNU General Public License for more details.
  */
 
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
-#include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
 #include "elog.h"
@@ -306,6 +303,9 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 void stream_init(struct stream *st, uint32_t idx) {
 	char name[8];
 
+	int rc = pthread_mutex_init(&st->mutex, NULL);
+	if (rc)
+		elog_err("pthread_mutex_init: %s\n", strerror(rc));
 	snprintf(name, 8, "m%d", idx);
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
@@ -321,10 +321,17 @@ void stream_init(struct stream *st, uint32_t idx) {
 }
 
 void stream_destroy(struct stream *st) {
+	int rc;
+
+	stream_lock(st);
 	stream_stop_pipeline(st);
 	gst_bus_remove_watch(st->bus);
 	g_object_unref(st->pipeline);
 	st->pipeline = NULL;
+	stream_unlock(st);
+	rc = pthread_mutex_destroy(&st->mutex);
+	if (rc)
+		elog_err("pthread_mutex_destroy: %s\n", strerror(rc));
 }
 
 void stream_set_location(struct stream *st, const char *loc) {
@@ -345,4 +352,16 @@ void stream_set_handle(struct stream *st, guintptr handle) {
 
 void stream_set_aspect(struct stream *st, gboolean aspect) {
 	st->aspect = aspect;
+}
+
+void stream_lock(struct stream *st) {
+	int rc = pthread_mutex_lock(&st->mutex);
+	if (rc)
+		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
+}
+
+void stream_unlock(struct stream *st) {
+	int rc = pthread_mutex_unlock(&st->mutex);
+	if (rc)
+		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
 }
