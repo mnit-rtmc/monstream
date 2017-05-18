@@ -146,8 +146,8 @@ static void stream_add_src_blank(struct stream *st) {
 static void stream_add_src_udp(struct stream *st) {
 	GstElement *src = gst_element_factory_make("udpsrc", NULL);
 	g_object_set(G_OBJECT(src), "uri", st->location, NULL);
-	// Post GstUDPSrcTimeout messages after 1 second (ns)
-	g_object_set(G_OBJECT(src), "timeout", ONE_SEC_NS, NULL);
+	// Post GstUDPSrcTimeout messages after 2 seconds (ns)
+	g_object_set(G_OBJECT(src), "timeout", 2 * ONE_SEC_NS, NULL);
 	stream_add(st, src);
 }
 

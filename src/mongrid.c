@@ -98,7 +98,7 @@ static void moncell_stop_stream(struct moncell *mc, guint delay) {
 static void moncell_stop(struct stream *st) {
 	/* Cast requires stream is first member of struct */
 	struct moncell *mc = (struct moncell *) st;
-	moncell_stop_stream(mc, 500);
+	moncell_stop_stream(mc, 1000);
 }
 
 static void moncell_ack_started(struct stream *st) {
