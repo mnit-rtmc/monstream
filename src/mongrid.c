@@ -81,6 +81,18 @@ static void moncell_restart_stream(struct moncell *mc) {
 	stream_unlock(&mc->stream);
 }
 
+static gboolean do_update_title(gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	stream_lock(&mc->stream);
+	if (mc->started)
+		moncell_set_accent(mc, mc->accent);
+	else
+		moncell_set_accent(mc, ACCENT_GRAY);
+	moncell_update_title(mc);
+	stream_unlock(&mc->stream);
+	return FALSE;
+}
+
 static gboolean do_restart(gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	moncell_restart_stream(mc);
@@ -88,7 +100,7 @@ static gboolean do_restart(gpointer data) {
 }
 
 static void moncell_stop_stream(struct moncell *mc, guint delay) {
-	moncell_set_accent(mc, ACCENT_GRAY);
+	g_timeout_add(0, do_update_title, mc);
 	stream_stop(&mc->stream);
 	mc->started = FALSE;
 	/* delay is needed to allow gtk+ to update accent color */
@@ -104,8 +116,7 @@ static void moncell_stop(struct stream *st) {
 static void moncell_ack_started(struct stream *st) {
 	/* Cast requires stream is first member of struct */
 	struct moncell *mc = (struct moncell *) st;
-	if (mc->started)
-		moncell_set_accent(mc, mc->accent);
+	g_timeout_add(0, do_update_title, mc);
 }
 
 static GtkWidget *create_title(struct moncell *mc) {
@@ -173,7 +184,6 @@ static int32_t moncell_play_stream(struct moncell *mc, const char *loc,
 	stream_set_encoding(&mc->stream, encoding);
 	stream_set_latency(&mc->stream, latency);
 	moncell_set_description(mc, desc);
-	moncell_update_title(mc);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 	stream_unlock(&mc->stream);
@@ -188,8 +198,7 @@ static void moncell_set_mon(struct moncell *mc, const char *mid,
 	strncpy(mc->accent, accent, sizeof(mc->accent));
 	stream_set_aspect(&mc->stream, aspect);
 	mc->font_sz = font_sz;
-	moncell_set_accent(mc, mc->accent);
-	moncell_update_title(mc);
+	g_timeout_add(0, do_update_title, mc);
 	stream_unlock(&mc->stream);
 }
 
