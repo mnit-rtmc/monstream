@@ -25,6 +25,9 @@
 #include "elog.h"
 #include "nstr.h"
 
+/* Host name of peer from which commands are accepted */
+const char *PEER = "tms-iris.dot.state.mn.us";
+
 /* ASCII separators */
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
@@ -55,7 +58,6 @@ static int open_bind(const char *service) {
 		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
 		return -1;
 	}
-
 	for (ai = rai; ai; ai = ai->ai_next) {
 		int fd = socket(ai->ai_family, ai->ai_socktype,
 			ai->ai_protocol);
@@ -69,6 +71,32 @@ static int open_bind(const char *service) {
 	}
 	freeaddrinfo(rai);
 	return -1;
+}
+
+static void connect_peer(int fd, const char *peer) {
+	struct addrinfo hints;
+	struct addrinfo *ai;
+	struct addrinfo *rai = NULL;
+	int rc;
+
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
+	rc = getaddrinfo(peer, NULL, &hints, &rai);
+	if (rc) {
+		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
+		return;
+	}
+	for (ai = rai; ai; ai = ai->ai_next) {
+		if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
+			freeaddrinfo(rai);
+			return;
+		}
+	}
+	elog_err("Could not connect to peer: %s\n", peer);
+	freeaddrinfo(rai);
+	return;
 }
 
 static uint32_t parse_latency(nstr_t lat) {
@@ -190,13 +218,13 @@ static void load_commands(uint32_t mon) {
 
 static bool read_commands(int fd) {
 	char buf[1024];
-	ssize_t n = read(fd, buf, 1023);
+	ssize_t n = read(fd, buf, sizeof(buf));
 
 	if (n < 0) {
 		elog_err("Read socket: %s\n", strerror(errno));
 		return false;
 	}
-	return process_commands(nstr_make(buf, 1024, n));
+	return process_commands(nstr_make(buf, sizeof(buf), n));
 }
 
 void *command_thread(void *data) {
@@ -206,6 +234,7 @@ void *command_thread(void *data) {
 	load_commands(*mon);
 	fd = open_bind("7001");
 	if (fd > 0) {
+		connect_peer(fd, PEER);
 		while (read_commands(fd)) { }
 		close(fd);
 	}
