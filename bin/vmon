@@ -1,0 +1,98 @@
+#!/usr/bin/python
+#
+# vmon -- List and control monstream video monitors
+#
+import psycopg2
+import socket
+import sys
+import getpass
+
+CONNECT  = 'dbname=tms user=%s'
+SELECT_V = 'SELECT mon_num, v.name, monitor_style, uri '
+FROM_V   = '''FROM video_monitor_view v JOIN comm_link_view c
+              ON v.comm_link = c.name '''
+WHERE_V  = '''WHERE v.name = '%s' OR mon_num::text = '%s' OR
+              monitor_style = '%s' '''
+ORDER_V  = 'ORDER BY mon_num, v.name'
+
+def lookup_mons(conn, q):
+    cursor = conn.cursor()
+    if q:
+        cursor.execute(SELECT_V + FROM_V + (WHERE_V % (q, q, q)) + ORDER_V)
+    else:
+        cursor.execute(SELECT_V + FROM_V + ORDER_V)
+    mons = cursor.fetchall()
+    cursor.close()
+    return mons
+
+SELECT_C = '''SELECT cam_num, c.name, uri_scheme, encoder, enc_mcast,
+                     uri_path, encoding, trim(trim(roadway || ' ' || road_dir)
+                     || ' ' || cross_mod || ' ' || cross_street)
+                     AS description, latency '''
+FROM_C   = '''FROM camera_view c
+              JOIN encoder_type_view et ON c.encoder_type = et.name '''
+WHERE_C  = 'WHERE c.name = \'%s\' OR cam_num::text = \'%s\' '
+ORDER_C  = 'ORDER by cam_num'
+
+def lookup_cams(conn, q):
+    cursor = conn.cursor()
+    if q:
+        cursor.execute(SELECT_C + FROM_C + (WHERE_C % (q, q)) + ORDER_C)
+    else:
+        cursor.execute(SELECT_C + FROM_C + ORDER_C)
+    cams = cursor.fetchall()
+    cursor.close()
+    return cams
+
+def make_uri(uri_scheme, encoder, uri_path, enc_mcast):
+    if enc_mcast:
+        return 'udp://' + enc_mcast
+    elif encoder:
+        return uri_scheme + '://' + encoder + uri_path
+    else:
+        return ''
+
+def make_play(cam):
+    (name, cam_num, uri_scheme, encoder, enc_mcast, uri_path, encoding,
+     description, latency) = cam
+    u = make_uri(uri_scheme, encoder, uri_path, enc_mcast)
+    if not u or not description:
+        return None
+    cmd = []
+    cmd.append('play')
+    cmd.append('0')	# FIXME: pin
+    if cam_num:
+        cmd.append(str(cam_num))
+    else:
+        cmd.append(name)
+    cmd.append(u)
+    cmd.append(encoding)
+    cmd.append(description)
+    cmd.append(str(latency))
+    return chr(31).join(cmd) + chr(30)
+
+def send_cmd(mon, cam):
+    cmd = make_play(cam)
+    host, port = mon[3].split(':')
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.sendto(cmd, (host, int(port)))
+
+if __name__ == '__main__':
+    conn = psycopg2.connect(CONNECT % getpass.getuser())
+    if len(sys.argv) > 1:
+        q = sys.argv[1]
+    else:
+        q = None
+    mons = lookup_mons(conn, q)
+    if len(sys.argv) < 3:
+        for mon in mons:
+            print ('%6s %10s %16s %20s' % mon)
+    else:
+        q = sys.argv[2]
+        cams = lookup_cams(conn, q)
+        for cam in cams:
+            for mon in mons:
+                send_cmd(mon, cam)
+        if not cams:
+            print ('Camera not found: %s' % q)
+    conn.close()
