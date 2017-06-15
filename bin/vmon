@@ -8,7 +8,7 @@ import sys
 import getpass
 
 CONNECT  = 'dbname=tms user=%s'
-SELECT_V = 'SELECT mon_num, v.name, monitor_style, uri '
+SELECT_V = 'SELECT mon_num, v.name, monitor_style, uri, pin '
 FROM_V   = '''FROM video_monitor_view v JOIN comm_link_view c
               ON v.comm_link = c.name '''
 WHERE_V  = '''WHERE v.name = '%s' OR mon_num::text = '%s' OR
@@ -52,7 +52,8 @@ def make_uri(uri_scheme, encoder, uri_path, enc_mcast):
     else:
         return ''
 
-def make_play(cam):
+def make_play(mon, cam):
+    pin = mon[4]
     (name, cam_num, uri_scheme, encoder, enc_mcast, uri_path, encoding,
      description, latency) = cam
     u = make_uri(uri_scheme, encoder, uri_path, enc_mcast)
@@ -60,7 +61,7 @@ def make_play(cam):
         return None
     cmd = []
     cmd.append('play')
-    cmd.append('0')	# FIXME: pin
+    cmd.append(str(pin - 1))
     if cam_num:
         cmd.append(str(cam_num))
     else:
@@ -72,7 +73,7 @@ def make_play(cam):
     return chr(31).join(cmd) + chr(30)
 
 def send_cmd(mon, cam):
-    cmd = make_play(cam)
+    cmd = make_play(mon, cam)
     host, port = mon[3].split(':')
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.sendto(cmd, (host, int(port)))
@@ -86,7 +87,7 @@ if __name__ == '__main__':
     mons = lookup_mons(conn, q)
     if len(sys.argv) < 3:
         for mon in mons:
-            print ('%6s %10s %16s %20s' % mon)
+            print ('%6s %10s %16s %20s %3s' % mon)
     else:
         q = sys.argv[2]
         cams = lookup_cams(conn, q)
