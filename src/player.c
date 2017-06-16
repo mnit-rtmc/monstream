@@ -32,16 +32,20 @@ const char *PEER = "tms-iris.dot.state.mn.us";
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
+void mongrid_create(void);
 int32_t mongrid_init(uint32_t num);
+void mongrid_clear(void);
 void mongrid_destroy(void);
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz);
-int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
+void mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
 	const char *encoding, uint32_t latency);
 
 #define DEFAULT_LATENCY	(50)
 #define DEFAULT_FONT_SZ (32)
 
+void config_init(void);
+void config_destroy(void);
 nstr_t config_load(const char *name, nstr_t str);
 ssize_t config_store(const char *name, nstr_t cmd);
 
@@ -177,28 +181,25 @@ static void process_monitor(nstr_t cmd) {
 static void process_config(nstr_t cmd) {
 	elog_cmd(cmd);
 	config_store("config", cmd);
+	gtk_main_quit();
 }
 
-static bool process_command(nstr_t cmd) {
+static void process_command(nstr_t cmd) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "play"))
 		process_play(cmd);
 	else if (nstr_cmp_z(p1, "monitor"))
 		process_monitor(cmd);
-	else if (nstr_cmp_z(p1, "config")) {
+	else if (nstr_cmp_z(p1, "config"))
 		process_config(cmd);
-		return false;
-	} else
+	else
 		elog_err("Invalid command: %s\n", nstr_z(cmd));
-	return true;
 }
 
-static bool process_commands(nstr_t str) {
+static void process_commands(nstr_t str) {
 	while (nstr_len(str)) {
-		if (!process_command(nstr_split(&str, RECORD_SEP)))
-			return false;
+		process_command(nstr_split(&str, RECORD_SEP));
 	}
-	return true;
 }
 
 static void load_command(const char *fname) {
@@ -218,29 +219,26 @@ static void load_commands(uint32_t mon) {
 	}
 }
 
-static bool read_commands(int fd) {
+static void read_commands(int fd) {
 	char buf[1024];
 	ssize_t n = read(fd, buf, sizeof(buf));
-
-	if (n < 0) {
+	if (n >= 0)
+		process_commands(nstr_make(buf, sizeof(buf), n));
+	else
 		elog_err("Read socket: %s\n", strerror(errno));
-		return false;
-	}
-	return process_commands(nstr_make(buf, sizeof(buf), n));
 }
 
 static void *command_thread(void *data) {
-	uint32_t *mon = data;
 	int fd;
 
-	load_commands(*mon);
 	fd = open_bind("7001");
 	if (fd > 0) {
 		connect_peer(fd, PEER);
-		while (read_commands(fd)) { }
+		while (true) {
+			read_commands(fd);
+		}
 		close(fd);
 	}
-	gtk_main_quit();
 	return NULL;
 }
 
@@ -261,23 +259,27 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
-bool run_player(void) {
+void run_player(void) {
 	pthread_t thread;
-	uint32_t mon;
 	int rc;
 
-	mon = load_config();
-	if (mongrid_init(mon))
-		return false;
-	rc = pthread_create(&thread, NULL, command_thread, &mon);
+	mongrid_create();
+	config_init();
+	rc = pthread_create(&thread, NULL, command_thread, NULL);
 	if (rc) {
-		elog_err("pthread_create: %d\n", rc);
+		elog_err("pthread_create: %d\n", strerror(rc));
 		goto fail;
 	}
-	gtk_main();
-	mongrid_destroy();
-	return true;
+
+	while (true) {
+		uint32_t mon = load_config();
+		if (mongrid_init(mon))
+			break;
+		load_commands(mon);
+		gtk_main();
+		mongrid_clear();
+	}
 fail:
+	config_destroy();
 	mongrid_destroy();
-	return false;
 }

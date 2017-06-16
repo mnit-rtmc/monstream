@@ -27,6 +27,14 @@
 static const uint32_t DEFAULT_LATENCY = 50;
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
+static void stream_lock(struct stream *st) {
+	lock_acquire(st->lock);
+}
+
+static void stream_unlock(struct stream *st) {
+	lock_release(st->lock);
+}
+
 static int stream_elem_next(const struct stream *st) {
 	int i = 0;
 	while (st->elem[i]) {
@@ -260,11 +268,10 @@ static void stream_do_stop(struct stream *st) {
 }
 
 static void stream_ack_started(struct stream *st) {
-	if (st->ack_started) {
-		stream_lock(st);
+	stream_lock(st);
+	if (st->ack_started)
 		st->ack_started(st);
-		stream_unlock(st);
-	}
+	stream_unlock(st);
 }
 
 static void stream_msg_eos(struct stream *st) {
@@ -333,10 +340,10 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
-void stream_init(struct stream *st, uint32_t idx) {
+void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	char name[8];
 
-	lock_init(&st->lock);
+	st->lock = lock;
 	snprintf(name, 8, "m%d", idx);
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
@@ -352,21 +359,11 @@ void stream_init(struct stream *st, uint32_t idx) {
 }
 
 void stream_destroy(struct stream *st) {
-	stream_lock(st);
 	stream_stop_pipeline(st);
 	gst_bus_remove_watch(st->bus);
 	g_object_unref(st->pipeline);
 	st->pipeline = NULL;
-	stream_unlock(st);
-	lock_destroy(&st->lock);
-}
-
-void stream_lock(struct stream *st) {
-	lock_acquire(&st->lock);
-}
-
-void stream_unlock(struct stream *st) {
-	lock_release(&st->lock);
+	st->lock = NULL;
 }
 
 void stream_set_handle(struct stream *st, guintptr handle) {

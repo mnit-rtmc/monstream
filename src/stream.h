@@ -9,7 +9,7 @@
 #define MAX_ELEMS	(16)
 
 struct stream {
-	struct lock	lock;
+	struct lock	*lock;
 	guintptr	handle;
 	gboolean	aspect;
 	char		location[128];
@@ -22,10 +22,8 @@ struct stream {
 	void		(*ack_started)	(struct stream *st);
 };
 
-void stream_init(struct stream *st, uint32_t idx);
+void stream_init(struct stream *st, uint32_t idx, struct lock *lock);
 void stream_destroy(struct stream *st);
-void stream_lock(struct stream *st);
-void stream_unlock(struct stream *st);
 void stream_set_handle(struct stream *st, guintptr handle);
 void stream_set_aspect(struct stream *st, gboolean aspect);
 void stream_set_location(struct stream *st, const char *loc);

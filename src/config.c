@@ -20,13 +20,26 @@
 #include <unistd.h>
 #include "elog.h"
 #include "nstr.h"
+#include "lock.h"
 
 static const char *PATH = "/var/lib/monstream/%s";
+
+/* Lock to protect config files */
+static struct lock _lock;
+
+void config_init(void) {
+	lock_init(&_lock);
+}
+
+void config_destroy(void) {
+	lock_destroy(&_lock);
+}
 
 nstr_t config_load(const char *name, nstr_t str) {
 	char path[64];
 	int fd;
 
+	lock_acquire(&_lock);
 	if (snprintf(path, sizeof(path), PATH, name) < 0) {
 		elog_err("Error: %s\n", strerror(errno));
 		goto err;
@@ -40,12 +53,16 @@ nstr_t config_load(const char *name, nstr_t str) {
 		}
 		str.len = n_bytes;
 		close(fd);
-		return str;
+		goto out;
 	} else {
 		elog_err("Open %s: %s\n", path, strerror(errno));
 		goto err;
 	}
+out:
+	lock_release(&_lock);
+	return str;
 err:
+	lock_release(&_lock);
 	str.len = 0;
 	return str;
 }
@@ -55,21 +72,26 @@ ssize_t config_store(const char *name, nstr_t cmd) {
 	int fd;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
+	lock_acquire(&_lock);
 	if (snprintf(path, sizeof(path), PATH, name) < 0) {
 		elog_err("Error: %s\n", strerror(errno));
-		return -1;
+		goto err;
 	}
 	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if (fd >= 0) {
 		ssize_t n_bytes = write(fd, cmd.buf, cmd.len);
 		if (n_bytes < 0) {
 			elog_err("Write %s: %s\n", path,strerror(errno));
-			return -1;
+			goto err;
 		}
 		close(fd);
+		lock_release(&_lock);
 		return n_bytes;
 	} else {
 		elog_err("Open %s: %s\n", path, strerror(errno));
-		return -1;
+		goto err;
 	}
+err:
+	lock_release(&_lock);
+	return -1;
 }
