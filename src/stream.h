@@ -1,6 +1,7 @@
 #ifndef STREAM_H
 #define STREAM_H
 
+#define _MULTI_THREADED
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
