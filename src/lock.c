@@ -20,23 +20,23 @@
 void lock_init(struct lock *l) {
 	int rc = pthread_mutex_init(&l->mutex, NULL);
 	if (rc)
-		elog_err("lock_init: %s\n", strerror(rc));
+		elog_err("pthread_mutex_init: %s\n", strerror(rc));
 }
 
 void lock_destroy(struct lock *l) {
 	int rc = pthread_mutex_destroy(&l->mutex);
 	if (rc)
-		elog_err("lock_destroy: %s\n", strerror(rc));
+		elog_err("pthread_mutex_destroy: %s\n", strerror(rc));
 }
 
 void lock_acquire(struct lock *l) {
 	int rc = pthread_mutex_lock(&l->mutex);
 	if (rc)
-		elog_err("config_lock: %s\n", strerror(rc));
+		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
 }
 
 void lock_release(struct lock *l) {
 	int rc = pthread_mutex_unlock(&l->mutex);
 	if (rc)
-		elog_err("config_unlock: %s\n", strerror(rc));
+		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
 }
