@@ -12,9 +12,7 @@
  * GNU General Public License for more details.
  */
 
-#include <gst/gst.h>
-#include <gtk/gtk.h>
-#include <stdbool.h>
+#include <stdio.h>
 
 #define VERSION "0.16"
 #define BANNER "monstream: v" VERSION "  Copyright (C)  MnDOT\n"
@@ -23,8 +21,6 @@ void run_player(void);
 
 int main(void) {
 	printf(BANNER);
-	gst_init(NULL, NULL);
-	gtk_init(NULL, NULL);
 	run_player();
 	return 1;
 }

@@ -271,6 +271,8 @@ static void hide_cursor(GtkWidget *window) {
 void mongrid_create(void) {
 	GtkWidget *window;
 
+	gst_init(NULL, NULL);
+	gtk_init(NULL, NULL);
 	lock_init(&grid.lock);
 	window = gtk_window_new(0);
 	grid.window = window;
