@@ -295,6 +295,7 @@ static void stream_msg_warning(struct stream *st, GstMessage *msg) {
 	g_free(debug);
 	stream_lock(st);
 	elog_err("Warning: %s  %s\n", warning->message, st->location);
+	stream_do_stop(st);
 	stream_unlock(st);
 	g_error_free(warning);
 }
