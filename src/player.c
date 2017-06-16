@@ -24,6 +24,7 @@
 #include <string.h>		/* for memset */
 #include "elog.h"
 #include "nstr.h"
+#include "lock.h"
 
 /* Host name of peer from which commands are accepted */
 const char *PEER = "tms-iris.dot.state.mn.us";
@@ -38,8 +39,9 @@ void mongrid_clear(void);
 void mongrid_destroy(void);
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz);
-void mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *encoding, uint32_t latency);
+void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
+	const char *desc, const char *encoding, uint32_t latency);
+nstr_t mongrid_status(nstr_t str);
 
 #define DEFAULT_LATENCY	(50)
 #define DEFAULT_FONT_SZ (32)
@@ -122,12 +124,14 @@ static void process_play(nstr_t cmd) {
 	assert(nstr_cmp_z(p1, "play"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
+		char cam_id[20];
 		char desc[128];
 		char uri[128];
 		char encoding[16];
 		char fname[16];
 		nstr_t d;
 
+		nstr_wrap(cam_id, sizeof(cam_id), p3);
 		nstr_wrap(uri, sizeof(uri), p4);
 		nstr_wrap(encoding, sizeof(encoding), p5);
 		d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
@@ -140,7 +144,8 @@ static void process_play(nstr_t cmd) {
 		}
 		nstr_z(d);
 		elog_cmd(cmd);
-		mongrid_play_stream(mon, uri, desc, encoding,parse_latency(p7));
+		mongrid_play_stream(mon, cam_id, uri, desc, encoding,
+			parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);
 	} else
@@ -219,13 +224,62 @@ static void load_commands(uint32_t mon) {
 	}
 }
 
+struct peer {
+	struct lock             lock;
+	int			fd;
+	struct sockaddr_storage addr;
+	socklen_t               len;
+};
+
+/* Peer host socket address */
+static struct peer peer_h;
+
+static bool has_peer(void) {
+	bool has_peer;
+
+ 	lock_acquire(&peer_h.lock);	
+	has_peer = peer_h.len;
+	lock_release(&peer_h.lock);
+
+	return has_peer;
+}
+
+static void log_peer(void) {
+	if (has_peer()) {
+		char host[NI_MAXHOST];
+		char service[NI_MAXSERV];
+		int s;
+
+	 	lock_acquire(&peer_h.lock);	
+		s = getnameinfo((struct sockaddr *) &peer_h.addr, peer_h.len,
+			host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+		lock_release(&peer_h.lock);
+		if (0 == s)
+			elog_err("Peer %s:%s\n", host, service);
+		else
+			elog_err("getnameinfo: %s\n", gai_strerror(s));
+	} else
+		elog_err("No peer address\n");
+}
+
 static void read_commands(int fd) {
-	char buf[1024];
-	ssize_t n = read(fd, buf, sizeof(buf));
+	char                    buf[1024];
+	struct sockaddr_storage addr;
+	socklen_t               len;
+
+	len = sizeof(struct sockaddr_storage);
+	ssize_t n = recvfrom(fd, buf, sizeof(buf), 0,
+		(struct sockaddr *) &addr, &len);
+ 	lock_acquire(&peer_h.lock);	
+	peer_h.addr = addr;
+	peer_h.len = len;
+	lock_release(&peer_h.lock);
 	if (n >= 0)
 		process_commands(nstr_make(buf, sizeof(buf), n));
-	else
+	else {
 		elog_err("Read socket: %s\n", strerror(errno));
+		log_peer();
+	}
 }
 
 static void *command_thread(void *data) {
@@ -233,11 +287,46 @@ static void *command_thread(void *data) {
 
 	fd = open_bind("7001");
 	if (fd > 0) {
+	 	lock_acquire(&peer_h.lock);	
+		peer_h.fd = fd;
+		lock_release(&peer_h.lock);
 		connect_peer(fd, PEER);
 		while (true) {
 			read_commands(fd);
 		}
 		close(fd);
+	}
+	return NULL;
+}
+
+static void send_status(nstr_t str) {
+	struct sockaddr_storage addr;
+	socklen_t               len;
+	int			fd;
+
+ 	lock_acquire(&peer_h.lock);	
+	addr = peer_h.addr;
+	len = peer_h.len;
+	fd = peer_h.fd;
+	lock_release(&peer_h.lock);
+
+	ssize_t n = sendto(fd, str.buf, str.len, 0,
+		(struct sockaddr *) &addr, len);
+	if (n < 0) {
+		elog_err("Send socket: %s\n", strerror(errno));
+		log_peer();
+	}
+}
+
+static void *status_thread(void *data) {
+	char buf[256];
+	while (true) {
+		if (has_peer()) {
+			nstr_t str = nstr_make(buf, sizeof(buf), 0);
+			str = mongrid_status(str);
+			send_status(str);
+		}
+		sleep(1);
 	}
 	return NULL;
 }
@@ -259,18 +348,23 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
-void run_player(void) {
+static bool create_thread(void *(func)(void *)) {
 	pthread_t thread;
-	int rc;
+	int rc = pthread_create(&thread, NULL, func, NULL);
+	if (rc)
+		elog_err("pthread_create: %d\n", strerror(rc));
+	return !rc;
+}
 
+void run_player(void) {
 	mongrid_create();
 	config_init();
-	rc = pthread_create(&thread, NULL, command_thread, NULL);
-	if (rc) {
-		elog_err("pthread_create: %d\n", strerror(rc));
+	lock_init(&peer_h.lock);
+	peer_h.len = 0;
+	if (!create_thread(command_thread))
 		goto fail;
-	}
-
+	if (!create_thread(status_thread))
+		goto fail;
 	while (true) {
 		uint32_t mon = load_config();
 		if (mongrid_init(mon))
@@ -280,6 +374,7 @@ void run_player(void) {
 		mongrid_clear();
 	}
 fail:
+	lock_destroy(&peer_h.lock);
 	config_destroy();
 	mongrid_destroy();
 }

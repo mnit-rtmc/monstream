@@ -23,6 +23,7 @@
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 #include "elog.h"
+#include "nstr.h"
 #include "stream.h"
 #include "lock.h"
 
@@ -30,6 +31,7 @@ struct moncell {
 	struct stream	stream;	/* must be first member, due to casting */
 	char		mid[8];
 	char		accent[8];
+	char		cam_id[20];
 	char		description[64];
 	uint32_t	font_sz;
 	GtkCssProvider	*css_provider;
@@ -39,6 +41,7 @@ struct moncell {
 	GtkWidget	*mon_lbl;
 	GtkWidget	*cam_lbl;
 	gboolean	started;
+	gboolean        failed;
 };
 
 struct mongrid {
@@ -58,6 +61,10 @@ static bool is_moncell_valid(struct moncell *mc) {
 }
 
 #define ACCENT_GRAY	"444444"
+
+static void moncell_set_cam_id(struct moncell *mc, const char *cam_id) {
+	strncpy(mc->cam_id, cam_id, sizeof(mc->cam_id));
+}
 
 static void moncell_set_description(struct moncell *mc, const char *desc) {
 	strncpy(mc->description, desc, sizeof(mc->description));
@@ -107,6 +114,7 @@ static gboolean do_restart(gpointer data) {
 }
 
 static void moncell_update_accent_title(struct moncell *mc) {
+	mc->failed = !mc->started;
 	if (mc->started)
 		moncell_set_accent(mc, mc->accent);
 	else
@@ -174,6 +182,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->stream.ack_started = moncell_ack_started;
 	memset(mc->mid, 0, sizeof(mc->mid));
 	memset(mc->accent, 0, sizeof(mc->accent));
+	memset(mc->cam_id, 0, sizeof(mc->cam_id));
 	memset(mc->description, 0, sizeof(mc->description));
 	mc->font_sz = 32;
 	mc->css_provider = gtk_css_provider_new();
@@ -183,6 +192,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->mon_lbl = create_label(mc, 6);
 	mc->cam_lbl = create_label(mc, 0);
 	mc->started = FALSE;
+	mc->failed = TRUE;
 
 	moncell_set_accent(mc, ACCENT_GRAY);
 	moncell_update_title(mc);
@@ -206,12 +216,14 @@ static void moncell_set_handle(struct moncell *mc) {
 	stream_set_handle(&mc->stream, handle);
 }
 
-static void moncell_play_stream(struct moncell *mc, const char *loc,
-	const char *desc, const char *encoding, uint32_t latency)
+static void moncell_play_stream(struct moncell *mc, const char *cam_id,
+	const char *loc, const char *desc, const char *encoding,
+	uint32_t latency)
 {
 	stream_set_location(&mc->stream, loc);
 	stream_set_encoding(&mc->stream, encoding);
 	stream_set_latency(&mc->stream, latency);
+	moncell_set_cam_id(mc, cam_id);
 	moncell_set_description(mc, desc);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
@@ -347,13 +359,13 @@ void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	lock_release(&grid.lock);
 }
 
-void mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
-	const char *encoding, uint32_t latency)
+void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
+	const char *desc, const char *encoding, uint32_t latency)
 {
 	lock_acquire(&grid.lock);
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		moncell_play_stream(mc, loc, desc, encoding, latency);
+		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency);
 	}
 	lock_release(&grid.lock);
 }
@@ -363,4 +375,35 @@ void mongrid_destroy(void) {
 	gtk_widget_destroy(grid.window);
 	grid.window = NULL;
 	lock_destroy(&grid.lock);
+}
+
+/* ASCII separators */
+static const char RECORD_SEP = '\x1E';
+static const char UNIT_SEP = '\x1F';
+
+static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
+	char buf[64];
+	char failed[8] = "";
+
+	if (mc->failed)
+		strcpy(failed, "failed");
+	snprintf(buf, sizeof(buf), "status%c%d%c%s%c%s%c", UNIT_SEP,
+		idx, UNIT_SEP,
+		mc->cam_id, UNIT_SEP,
+		failed, RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	return str;
+}
+
+nstr_t mongrid_status(nstr_t str) {
+	lock_acquire(&grid.lock);
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct moncell *mc = grid.cells + i;
+			str = moncell_status(mc, str, i);
+		}
+	}
+	lock_release(&grid.lock);
+	return str;
 }
