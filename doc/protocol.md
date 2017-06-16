@@ -29,8 +29,12 @@ Commands are separated by ASCII record separator (30).
 6. Title: ASCII text description
 7. Latency (0-2000 ms)
 
-## UDP response
+## Asynchronous UDP status
 
-Must contain 1 field
+Sent once per second for each monitor.  Destination port is taken from last
+received command.
 
-1. Error description, or empty string for ACK
+1. status
+2. Monitor index (0 to 15)
+3. Camera ID
+4. Stream status error (blank for OK)
