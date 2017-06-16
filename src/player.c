@@ -32,6 +32,8 @@ const char *PEER = "tms-iris.dot.state.mn.us";
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
+int32_t mongrid_init(uint32_t num);
+void mongrid_destroy(void);
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz);
 int32_t mongrid_play_stream(uint32_t idx, const char *loc, const char *desc,
@@ -227,7 +229,7 @@ static bool read_commands(int fd) {
 	return process_commands(nstr_make(buf, sizeof(buf), n));
 }
 
-void *command_thread(void *data) {
+static void *command_thread(void *data) {
 	uint32_t *mon = data;
 	int fd;
 
@@ -242,7 +244,7 @@ void *command_thread(void *data) {
 	return NULL;
 }
 
-uint32_t load_config(void) {
+static uint32_t load_config(void) {
 	char buf[128];
 	nstr_t str = config_load("config", nstr_make(buf, sizeof(buf), 0));
 	if (nstr_len(str)) {
@@ -257,4 +259,25 @@ uint32_t load_config(void) {
 			elog_err("Invalid command: %s\n", nstr_z(str));
 	}
 	return 1;
+}
+
+bool run_player(void) {
+	pthread_t thread;
+	uint32_t mon;
+	int rc;
+
+	mon = load_config();
+	if (mongrid_init(mon))
+		return false;
+	rc = pthread_create(&thread, NULL, command_thread, &mon);
+	if (rc) {
+		elog_err("pthread_create: %d\n", rc);
+		goto fail;
+	}
+	gtk_main();
+	mongrid_destroy();
+	return true;
+fail:
+	mongrid_destroy();
+	return false;
 }
