@@ -1,16 +1,15 @@
 #ifndef STREAM_H
 #define STREAM_H
 
-#define _MULTI_THREADED
-#include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <gst/gst.h>
+#include "lock.h"
 
 #define MAX_ELEMS	(16)
 
 struct stream {
-	pthread_mutex_t mutex;
+	struct lock	lock;
 	guintptr	handle;
 	gboolean	aspect;
 	char		location[128];
