@@ -14,7 +14,7 @@
 
 #include <stdio.h>
 
-#define VERSION "0.16"
+#define VERSION "0.17"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
 
 void run_player(void);
