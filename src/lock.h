@@ -10,7 +10,7 @@ struct lock {
 
 void lock_init(struct lock *l);
 void lock_destroy(struct lock *l);
-void lock_acquire(struct lock *l);
-void lock_release(struct lock *l);
+void lock_acquire(struct lock *l, const char *at);
+void lock_release(struct lock *l, const char *at);
 
 #endif

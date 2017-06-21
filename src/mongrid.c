@@ -103,16 +103,6 @@ static void moncell_restart_stream(struct moncell *mc) {
 	}
 }
 
-static gboolean do_restart(gpointer data) {
-	struct moncell *mc = (struct moncell *) data;
-	lock_acquire(&grid.lock);
-	/* moncell may have been freed while timer ran */
-	if (is_moncell_valid(mc))
-		moncell_restart_stream(mc);
-	lock_release(&grid.lock);
-	return FALSE;
-}
-
 static void moncell_update_accent_title(struct moncell *mc) {
 	mc->failed = !mc->started;
 	if (mc->started)
@@ -124,11 +114,21 @@ static void moncell_update_accent_title(struct moncell *mc) {
 
 static gboolean do_update_title(gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "do_update_title");
 	/* moncell may have been freed while timer ran */
 	if (is_moncell_valid(mc))
 		moncell_update_accent_title(mc);
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "do_update_title");
+	return FALSE;
+}
+
+static gboolean do_restart(gpointer data) {
+	struct moncell *mc = (struct moncell *) data;
+	lock_acquire(&grid.lock, "do_restart");
+	/* moncell may have been freed while timer ran */
+	if (is_moncell_valid(mc))
+		moncell_restart_stream(mc);
+	lock_release(&grid.lock, "do_restart");
 	return FALSE;
 }
 
@@ -295,7 +295,7 @@ void mongrid_create(void) {
 }
 
 int32_t mongrid_init(uint32_t num) {
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "mongrid_init");
 	if (num > 16) {
 		grid.rows = 0;
 		grid.cols = 0;
@@ -323,15 +323,15 @@ int32_t mongrid_init(uint32_t num) {
 	gtk_widget_show_all(grid.window);
 	gtk_widget_realize(grid.window);
 	mongrid_set_handles();
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_init");
 	return 0;
 err:
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_init");
 	return 1;
 }
 
 void mongrid_clear(void) {
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "mongrid_clear");
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
@@ -345,29 +345,29 @@ void mongrid_clear(void) {
 	grid.cols = 0;
 	gtk_container_remove(GTK_CONTAINER(grid.window),
 		(GtkWidget *) grid.grid);
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_clear");
 }
 
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz)
 {
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "mongrid_set_mon");
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
 		moncell_set_mon(mc, mid, accent, aspect, font_sz);
 	}
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_set_mon");
 }
 
 void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency)
 {
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "mongrid_play_stream");
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
 		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency);
 	}
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_play_stream");
 }
 
 void mongrid_destroy(void) {
@@ -396,7 +396,7 @@ static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
 }
 
 nstr_t mongrid_status(nstr_t str) {
-	lock_acquire(&grid.lock);
+	lock_acquire(&grid.lock, "mongrid_status");
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
@@ -404,6 +404,6 @@ nstr_t mongrid_status(nstr_t str) {
 			str = moncell_status(mc, str, i);
 		}
 	}
-	lock_release(&grid.lock);
+	lock_release(&grid.lock, "mongrid_status");
 	return str;
 }

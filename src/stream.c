@@ -27,14 +27,6 @@
 static const uint32_t DEFAULT_LATENCY = 50;
 static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
-static void stream_lock(struct stream *st) {
-	lock_acquire(st->lock);
-}
-
-static void stream_unlock(struct stream *st) {
-	lock_release(st->lock);
-}
-
 static int stream_elem_next(const struct stream *st) {
 	int i = 0;
 	while (st->elem[i]) {
@@ -268,17 +260,17 @@ static void stream_do_stop(struct stream *st) {
 }
 
 static void stream_ack_started(struct stream *st) {
-	stream_lock(st);
+	lock_acquire(st->lock, "stream_ack_started");
 	if (st->ack_started)
 		st->ack_started(st);
-	stream_unlock(st);
+	lock_release(st->lock, "stream_ack_started");
 }
 
 static void stream_msg_eos(struct stream *st) {
-	stream_lock(st);
+	lock_acquire(st->lock, "stream_msg_eos");
 	elog_err("End of stream: %s\n", st->location);
 	stream_do_stop(st);
-	stream_unlock(st);
+	lock_release(st->lock, "stream_msg_eos");
 }
 
 static void stream_msg_error(struct stream *st, GstMessage *msg) {
@@ -287,10 +279,10 @@ static void stream_msg_error(struct stream *st, GstMessage *msg) {
 
 	gst_message_parse_error(msg, &error, &debug);
 	g_free(debug);
-	stream_lock(st);
+	lock_acquire(st->lock, "stream_msg_error");
 	elog_err("Error: %s  %s\n", error->message, st->location);
 	stream_do_stop(st);
-	stream_unlock(st);
+	lock_release(st->lock, "stream_msg_error");
 	g_error_free(error);
 }
 
@@ -300,19 +292,19 @@ static void stream_msg_warning(struct stream *st, GstMessage *msg) {
 
 	gst_message_parse_warning(msg, &warning, &debug);
 	g_free(debug);
-	stream_lock(st);
+	lock_acquire(st->lock, "stream_msg_warning");
 	elog_err("Warning: %s  %s\n", warning->message, st->location);
 	stream_do_stop(st);
-	stream_unlock(st);
+	lock_release(st->lock, "stream_msg_warning");
 	g_error_free(warning);
 }
 
 static void stream_msg_element(struct stream *st, GstMessage *msg) {
 	if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
 		elog_err("udpsrc timeout -- stopping stream\n");
-		stream_lock(st);
+		lock_acquire(st->lock, "stream_msg_element");
 		stream_do_stop(st);
-		stream_unlock(st);
+		lock_release(st->lock, "stream_msg_element");
 	}
 }
 
