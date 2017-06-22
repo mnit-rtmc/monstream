@@ -30,7 +30,9 @@ void lock_destroy(struct lock *l) {
 }
 
 void lock_acquire(struct lock *l, const char *at) {
+#if 0
 	elog_err("acquired lock %p @ %s\n", &l->mutex, at);
+#endif
 	int rc = pthread_mutex_lock(&l->mutex);
 	if (rc)
 		elog_err("pthread_mutex_lock: %s\n", strerror(rc));
@@ -40,5 +42,7 @@ void lock_release(struct lock *l, const char *at) {
 	int rc = pthread_mutex_unlock(&l->mutex);
 	if (rc)
 		elog_err("pthread_mutex_unlock: %s\n", strerror(rc));
-	elog_err("released lock %p & %s\n", &l->mutex, at);
+#if 0
+	elog_err("released lock %p @ %s\n", &l->mutex, at);
+#endif
 }
