@@ -1,7 +1,7 @@
 CC = gcc
-DEPS = gtk+-3.0 gstreamer-1.0 gstreamer-video-1.0
+DEPS = gtk+-3.0 gstreamer-1.0 gstreamer-video-1.0 gstreamer-plugins-base-1.0 libcurl
 CFLAGS = -std=gnu11 -O2 -Wall -Werror -flto `pkg-config --cflags $(DEPS)`
-LIBS = `pkg-config --libs $(DEPS)`
+LIBS = `pkg-config --libs $(DEPS)` -lgstsdp-1.0
 TARGET = monstream
 
 all:  $(TARGET)

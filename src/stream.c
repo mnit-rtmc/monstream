@@ -110,16 +110,17 @@ static GstCaps *create_caps_mpeg2(void) {
 	                           NULL);
 }
 
-static GstCaps *create_caps_generic(void) {
+static GstCaps *create_caps_generic(const struct stream *st) {
 	return gst_caps_new_simple("application/x-rtp",
-	                           "clock-rate", G_TYPE_INT, 90000,
-	                           NULL);
+	                "clock-rate", G_TYPE_INT, 90000,
+	                "sprop-parameter-sets", G_TYPE_STRING, st->sprops,
+	                NULL);
 }
 
-static GstCaps *stream_create_caps(struct stream *st) {
+static GstCaps *stream_create_caps(const struct stream *st) {
 	return (strcmp("MPEG2", st->encoding) == 0)
 	      ?	create_caps_mpeg2()
-	      : create_caps_generic();
+	      : create_caps_generic(st);
 }
 
 static void stream_add_filter(struct stream *st) {
@@ -339,6 +340,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	snprintf(name, 8, "m%d", idx);
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
+	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = DEFAULT_LATENCY;
 	st->handle = 0;
 	st->aspect = FALSE;
@@ -372,6 +374,10 @@ void stream_set_location(struct stream *st, const char *loc) {
 
 void stream_set_encoding(struct stream *st, const char *encoding) {
 	strncpy(st->encoding, encoding, sizeof(st->encoding));
+}
+
+void stream_set_sprops(struct stream *st, const char *sprops) {
+	strncpy(st->sprops, sprops, sizeof(st->sprops));
 }
 
 void stream_set_latency(struct stream *st, uint32_t latency) {

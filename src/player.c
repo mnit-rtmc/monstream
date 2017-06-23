@@ -13,7 +13,9 @@
  */
 
 #include <assert.h>
+#include <curl/curl.h>
 #include <errno.h>
+#include <gst/sdp/sdp.h>
 #include <gtk/gtk.h>
 #include <netdb.h>		/* for socket stuff */
 #define _MULTI_THREADED
@@ -40,7 +42,8 @@ void mongrid_destroy(void);
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	gboolean aspect, uint32_t font_sz);
 void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
-	const char *desc, const char *encoding, uint32_t latency);
+	const char *desc, const char *encoding, uint32_t latency,
+	const char *sprops);
 nstr_t mongrid_status(nstr_t str);
 
 #define DEFAULT_LATENCY	(50)
@@ -112,6 +115,115 @@ static uint32_t parse_latency(nstr_t lat) {
 	return (l > 0) ? l : DEFAULT_LATENCY;
 }
 
+static bool is_sdp_uri(const char *uri) {
+	return (strncmp("http://", uri, 7) == 0)
+	    && (strstr(uri, ".sdp") != NULL);
+}
+
+static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
+	size_t sz = size * nmemb;
+	nstr_t *str = (nstr_t *) uptr;
+	nstr_t src = nstr_make(contents, sz, sz);
+	nstr_cat(str, src);
+	return nstr_len(*str);
+}
+
+static nstr_t get_sdp(const char *uri, nstr_t str) {
+	CURL *ch;
+	CURLcode rc;
+
+	ch = curl_easy_init();
+	curl_easy_setopt(ch, CURLOPT_URL, uri);
+	curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, 2L);
+	curl_easy_setopt(ch, CURLOPT_TIMEOUT, 2L);
+	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, sdp_write);
+	curl_easy_setopt(ch, CURLOPT_WRITEDATA, &str);
+	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, 0);
+	rc = curl_easy_perform(ch);
+	if (rc != CURLE_OK)
+		elog_err("curl error: %s\n", curl_easy_strerror(rc));
+	curl_easy_cleanup(ch);
+	return str;
+}
+
+static bool parse_sdp(nstr_t sdp, nstr_t *udp_uri, nstr_t *sprops) {
+	GstSDPMessage msg;
+	memset(&msg, 0, sizeof(msg));
+	if (gst_sdp_message_init(&msg) != GST_SDP_OK) {
+		elog_err("gst_sdp_message_init error\n");
+		return false;
+	}
+	if (gst_sdp_message_parse_buffer((const guint8 *) sdp.buf, sdp.len,
+		&msg) != GST_SDP_OK)
+	{
+		elog_err("gst_sdp_message_parse_buffer error\n");
+		goto err;
+	}
+	guint n_medias = gst_sdp_message_medias_len(&msg);
+	for (guint i = 0; i < n_medias; i++) {
+		char uri[64];
+		const GstSDPMedia *media = gst_sdp_message_get_media(&msg, i);
+		const GstSDPConnection *conn;
+		const GstCaps *caps;
+		const GstStructure *st;
+		const char *sp;
+
+		if (strncmp("video", gst_sdp_media_get_media(media), 5) != 0)
+			continue;
+		conn = gst_sdp_media_get_connection(media, 0);
+		if (!gst_sdp_address_is_multicast(conn->nettype, conn->addrtype,
+			conn->address))
+			continue;
+		caps = gst_sdp_media_get_caps_from_media(media, (gint) 96);
+		st = gst_caps_get_structure(caps, 0);
+		if (!gst_structure_has_field_typed(st,
+			"sprop-parameter-sets", G_TYPE_STRING))
+			continue;
+
+		snprintf(uri, sizeof(uri), "udp://%s:%d", conn->address,
+			gst_sdp_media_get_port(media));
+		nstr_cat_z(udp_uri, uri);
+		sp = gst_structure_get_string(st, "sprop-parameter-sets");
+		nstr_cat_z(sprops, sp);
+		goto out;
+	}
+err:
+	gst_sdp_message_uninit(&msg);
+	return false;
+out:
+	gst_sdp_message_uninit(&msg);
+	return true;
+}
+
+static void play_stream(int mon, const char *cam_id, const char *uri,
+	const char *desc, const char *encoding, uint32_t latency)
+{
+	/* NOTE: With Axis Q7436 encoders, using a pipeline with sdpdemux causes
+	 *       periodic EOS to happen under certain conditions.  It appears to
+	 *       happen only when many clients are accessing the "alwaysmulti"
+	 *       SDP stream provided by the encoder.  The workaround here is to
+	 *       read the SDP file (with libcurl), parse it, and build a simpler
+	 *       pipeline with udpsrc (and not use sdpdemux at all). */
+	if (is_sdp_uri(uri)) {
+		char buf[1024];
+		nstr_t sdp = get_sdp(uri, nstr_make(buf, sizeof(buf), 0));
+		if (nstr_len(sdp) > 0) {
+			char sp_buf[64];
+			char udp_buf[64];
+			nstr_t udp_uri = nstr_make(udp_buf, sizeof(udp_buf), 0);
+			nstr_t sprops = nstr_make(sp_buf, sizeof(sp_buf), 0);
+			if (parse_sdp(sdp, &udp_uri, &sprops)) {
+				mongrid_play_stream(mon, cam_id, nstr_z(
+					udp_uri), desc, encoding, latency,
+					nstr_z(sprops));
+				return;
+			}
+		}
+	}
+	mongrid_play_stream(mon, cam_id, uri, desc, encoding, latency, "");
+}
+
 static void process_play(nstr_t cmd) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "play"
@@ -144,7 +256,7 @@ static void process_play(nstr_t cmd) {
 		}
 		nstr_z(d);
 		elog_cmd(cmd);
-		mongrid_play_stream(mon, cam_id, uri, desc, encoding,
+		play_stream(mon, cam_id, uri, desc, encoding,
 			parse_latency(p7));
 		sprintf(fname, "play.%d", mon);
 		config_store(fname, cmd);

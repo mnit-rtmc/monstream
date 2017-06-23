@@ -13,6 +13,7 @@
  */
 
 #include <stdio.h>
+#include <curl/curl.h>
 
 #define VERSION "0.17"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
@@ -21,6 +22,8 @@ void run_player(void);
 
 int main(void) {
 	printf(BANNER);
+	curl_global_init(CURL_GLOBAL_ALL);
 	run_player();
+	curl_global_cleanup();
 	return 1;
 }

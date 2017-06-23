@@ -14,6 +14,7 @@ struct stream {
 	gboolean	aspect;
 	char		location[128];
 	char		encoding[8];
+	char		sprops[64];
 	uint32_t	latency;
 	GstElement	*pipeline;
 	GstBus		*bus;
@@ -28,6 +29,7 @@ void stream_set_handle(struct stream *st, guintptr handle);
 void stream_set_aspect(struct stream *st, gboolean aspect);
 void stream_set_location(struct stream *st, const char *loc);
 void stream_set_encoding(struct stream *st, const char *encoding);
+void stream_set_sprops(struct stream *st, const char *sprops);
 void stream_set_latency(struct stream *st, uint32_t latency);
 void stream_start(struct stream *st);
 void stream_stop(struct stream *st);
