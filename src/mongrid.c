@@ -126,10 +126,8 @@ static gboolean do_stop_stream(gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	lock_acquire(&grid.lock, "do_stop_stream");
 	/* moncell may have been freed while timer ran */
-	if (is_moncell_valid(mc)) {
+	if (is_moncell_valid(mc))
 		stream_stop(&mc->stream);
-		mc->started = FALSE;
-	}
 	lock_release(&grid.lock, "do_stop_stream");
 	return FALSE;
 }
@@ -145,6 +143,7 @@ static gboolean do_restart(gpointer data) {
 }
 
 static void moncell_stop_stream(struct moncell *mc, guint delay) {
+	mc->started = FALSE;
 	g_timeout_add(0, do_update_title, mc);
 	g_timeout_add(0, do_stop_stream, mc);
 	/* delay is needed to allow gtk+ to update accent color */
