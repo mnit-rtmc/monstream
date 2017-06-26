@@ -261,17 +261,17 @@ static void stream_do_stop(struct stream *st) {
 }
 
 static void stream_ack_started(struct stream *st) {
-	lock_acquire(st->lock, "stream_ack_started");
+	lock_acquire(st->lock, __func__);
 	if (st->ack_started)
 		st->ack_started(st);
-	lock_release(st->lock, "stream_ack_started");
+	lock_release(st->lock, __func__);
 }
 
 static void stream_msg_eos(struct stream *st) {
-	lock_acquire(st->lock, "stream_msg_eos");
+	lock_acquire(st->lock, __func__);
 	elog_err("End of stream: %s\n", st->location);
 	stream_do_stop(st);
-	lock_release(st->lock, "stream_msg_eos");
+	lock_release(st->lock, __func__);
 }
 
 static void stream_msg_error(struct stream *st, GstMessage *msg) {
@@ -280,10 +280,10 @@ static void stream_msg_error(struct stream *st, GstMessage *msg) {
 
 	gst_message_parse_error(msg, &error, &debug);
 	g_free(debug);
-	lock_acquire(st->lock, "stream_msg_error");
+	lock_acquire(st->lock, __func__);
 	elog_err("Error: %s  %s\n", error->message, st->location);
 	stream_do_stop(st);
-	lock_release(st->lock, "stream_msg_error");
+	lock_release(st->lock, __func__);
 	g_error_free(error);
 }
 
@@ -293,19 +293,19 @@ static void stream_msg_warning(struct stream *st, GstMessage *msg) {
 
 	gst_message_parse_warning(msg, &warning, &debug);
 	g_free(debug);
-	lock_acquire(st->lock, "stream_msg_warning");
+	lock_acquire(st->lock, __func__);
 	elog_err("Warning: %s  %s\n", warning->message, st->location);
 	stream_do_stop(st);
-	lock_release(st->lock, "stream_msg_warning");
+	lock_release(st->lock, __func__);
 	g_error_free(warning);
 }
 
 static void stream_msg_element(struct stream *st, GstMessage *msg) {
 	if (gst_message_has_name(msg, "GstUDPSrcTimeout")) {
 		elog_err("udpsrc timeout -- stopping stream\n");
-		lock_acquire(st->lock, "stream_msg_element");
+		lock_acquire(st->lock, __func__);
 		stream_do_stop(st);
-		lock_release(st->lock, "stream_msg_element");
+		lock_release(st->lock, __func__);
 	}
 }
 

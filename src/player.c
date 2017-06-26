@@ -349,9 +349,9 @@ static struct peer peer_h;
 static bool has_peer(void) {
 	bool has_peer;
 
- 	lock_acquire(&peer_h.lock, "has_peer");
+ 	lock_acquire(&peer_h.lock, __func__);
 	has_peer = peer_h.len;
-	lock_release(&peer_h.lock, "has_peer");
+	lock_release(&peer_h.lock, __func__);
 
 	return has_peer;
 }
@@ -362,10 +362,10 @@ static void log_peer(void) {
 		char service[NI_MAXSERV];
 		int s;
 
-	 	lock_acquire(&peer_h.lock, "log_peer");
+	 	lock_acquire(&peer_h.lock, __func__);
 		s = getnameinfo((struct sockaddr *) &peer_h.addr, peer_h.len,
 			host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
-		lock_release(&peer_h.lock, "log_peer");
+		lock_release(&peer_h.lock, __func__);
 		if (0 == s)
 			elog_err("Peer %s:%s\n", host, service);
 		else
@@ -382,10 +382,10 @@ static void read_commands(int fd) {
 	len = sizeof(struct sockaddr_storage);
 	ssize_t n = recvfrom(fd, buf, sizeof(buf), 0,
 		(struct sockaddr *) &addr, &len);
- 	lock_acquire(&peer_h.lock, "read_commands");
+ 	lock_acquire(&peer_h.lock, __func__);
 	peer_h.addr = addr;
 	peer_h.len = len;
-	lock_release(&peer_h.lock, "read_commands");
+	lock_release(&peer_h.lock, __func__);
 	if (n >= 0)
 		process_commands(nstr_make(buf, sizeof(buf), n));
 	else {
@@ -399,9 +399,9 @@ static void *command_thread(void *data) {
 
 	fd = open_bind("7001");
 	if (fd > 0) {
-	 	lock_acquire(&peer_h.lock, "command_thread");
+	 	lock_acquire(&peer_h.lock, __func__);
 		peer_h.fd = fd;
-		lock_release(&peer_h.lock, "command_thread");
+		lock_release(&peer_h.lock, __func__);
 		connect_peer(fd, PEER);
 		while (true) {
 			read_commands(fd);
@@ -416,11 +416,11 @@ static void send_status(nstr_t str) {
 	socklen_t               len;
 	int			fd;
 
- 	lock_acquire(&peer_h.lock, "send_status");
+ 	lock_acquire(&peer_h.lock, __func__);
 	addr = peer_h.addr;
 	len = peer_h.len;
 	fd = peer_h.fd;
-	lock_release(&peer_h.lock, "send_status");
+	lock_release(&peer_h.lock, __func__);
 
 	ssize_t n = sendto(fd, str.buf, str.len, 0,
 		(struct sockaddr *) &addr, len);

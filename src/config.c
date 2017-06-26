@@ -39,7 +39,7 @@ nstr_t config_load(const char *name, nstr_t str) {
 	char path[64];
 	int fd;
 
-	lock_acquire(&_lock, "config_load");
+	lock_acquire(&_lock, __func__);
 	if (snprintf(path, sizeof(path), PATH, name) < 0) {
 		elog_err("Error: %s\n", strerror(errno));
 		goto err;
@@ -59,10 +59,10 @@ nstr_t config_load(const char *name, nstr_t str) {
 		goto err;
 	}
 out:
-	lock_release(&_lock, "config_load");
+	lock_release(&_lock, __func__);
 	return str;
 err:
-	lock_release(&_lock, "config_load");
+	lock_release(&_lock, __func__);
 	str.len = 0;
 	return str;
 }
@@ -72,7 +72,7 @@ ssize_t config_store(const char *name, nstr_t cmd) {
 	int fd;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
-	lock_acquire(&_lock, "config_store");
+	lock_acquire(&_lock, __func__);
 	if (snprintf(path, sizeof(path), PATH, name) < 0) {
 		elog_err("Error: %s\n", strerror(errno));
 		goto err;
@@ -85,13 +85,13 @@ ssize_t config_store(const char *name, nstr_t cmd) {
 			goto err;
 		}
 		close(fd);
-		lock_release(&_lock, "config_store");
+		lock_release(&_lock, __func__);
 		return n_bytes;
 	} else {
 		elog_err("Open %s: %s\n", path, strerror(errno));
 		goto err;
 	}
 err:
-	lock_release(&_lock, "config_store");
+	lock_release(&_lock, __func__);
 	return -1;
 }
