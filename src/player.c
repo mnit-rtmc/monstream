@@ -188,6 +188,7 @@ static bool parse_sdp(nstr_t sdp, nstr_t *udp_uri, nstr_t *sprops) {
 		nstr_cat_z(sprops, sp);
 		goto out;
 	}
+	elog_err("parse_sdp failed: no valid media\n");
 err:
 	gst_sdp_message_uninit(&msg);
 	return false;
@@ -205,6 +206,9 @@ static void play_stream(int mon, const char *cam_id, const char *uri,
 	 *       SDP stream provided by the encoder.  The workaround here is to
 	 *       read the SDP file (with libcurl), parse it, and build a simpler
 	 *       pipeline with udpsrc (and not use sdpdemux at all). */
+	/* NOTE: Also, the sdpdemux element can trigger deadlocks when
+	 *       attempting to stop the pipeline.  I guess it's in
+	 *       gst-plugins-bad for a reason.  */
 	if (is_sdp_uri(uri)) {
 		char buf[1024];
 		nstr_t sdp = get_sdp(uri, nstr_make(buf, sizeof(buf), 0));

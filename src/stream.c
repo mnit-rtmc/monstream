@@ -131,12 +131,14 @@ static void stream_add_filter(struct stream *st) {
 	stream_add(st, fltr);
 }
 
+#if USE_BUGGY_SDPDEMUX
 static void stream_add_sdp_demux(struct stream *st) {
 	GstElement *sdp = gst_element_factory_make("sdpdemux", NULL);
 	g_object_set(G_OBJECT(sdp), "latency", st->latency, NULL);
 	g_object_set(G_OBJECT(sdp), "timeout", ONE_SEC_US, NULL);
 	stream_add(st, sdp);
 }
+#endif
 
 static void stream_add_src_blank(struct stream *st) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
@@ -210,8 +212,10 @@ static void stream_add_udp_pipe(struct stream *st) {
 }
 
 static void stream_add_http_pipe(struct stream *st) {
+#if USE_BUGGY_SDPDEMUX
 	if (strcmp("PNG", st->encoding) != 0)
 		stream_add_sdp_demux(st);
+#endif
 	stream_add_src_http(st);
 }
 
