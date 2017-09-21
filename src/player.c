@@ -141,8 +141,10 @@ static nstr_t get_sdp(const char *uri, nstr_t str) {
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, &str);
 	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, 0);
 	rc = curl_easy_perform(ch);
-	if (rc != CURLE_OK)
+	if (rc != CURLE_OK) {
 		elog_err("curl error: %s\n", curl_easy_strerror(rc));
+		str = nstr_make(str.buf, 0, 0);
+	}
 	curl_easy_cleanup(ch);
 	return str;
 }
