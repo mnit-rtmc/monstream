@@ -77,6 +77,9 @@ static const char CSS_FORMAT[] =
 		"font-size: %upt; "
 		"font-weight: Bold "
 	"}\n"
+	"label#mon_lbl {"
+		"color: #FFFF88; "
+	"}\n"
 	"box.title { "
 		"background-color: #%s "
 	"}";
@@ -200,6 +203,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->video = gtk_drawing_area_new();
 	mc->title = create_title(mc);
 	mc->mon_lbl = create_label(mc, 6);
+	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
 	mc->cam_lbl = create_label(mc, 0);
 	mc->started = FALSE;
 	mc->failed = TRUE;
