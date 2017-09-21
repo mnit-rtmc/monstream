@@ -362,14 +362,19 @@ static bool has_peer(void) {
 
 static void log_peer(void) {
 	if (has_peer()) {
+		struct sockaddr_storage addr;
+		socklen_t len;
 		char host[NI_MAXHOST];
 		char service[NI_MAXSERV];
 		int s;
 
 	 	lock_acquire(&peer_h.lock, __func__);
-		s = getnameinfo((struct sockaddr *) &peer_h.addr, peer_h.len,
-			host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
+		addr = peer_h.addr;
+		len = peer_h.len;
 		lock_release(&peer_h.lock, __func__);
+
+		s = getnameinfo((struct sockaddr *) &addr, len, host,
+			NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
 		if (0 == s)
 			elog_err("Peer %s:%s\n", host, service);
 		else
