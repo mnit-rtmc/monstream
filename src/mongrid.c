@@ -77,18 +77,26 @@ static const char CSS_FORMAT[] =
 		"font-size: %upt; "
 		"font-weight: Bold "
 	"}\n"
+	"box.title { "
+		"margin-top: 1px; "
+		"background-color: #%s; "
+	"}\n"
+	"label {"
+		"padding-left: 8px; "
+		"padding-right: 8px; "
+	"}\n"
 	"label#mon_lbl {"
 		"color: #FFFF88; "
-	"}\n"
-	"box.title { "
-		"background-color: #%s "
-	"}";
+		"background-color: #%s; "
+		"border-right: solid 1px white; "
+	"}\n";
 
-static void moncell_set_accent(struct moncell *mc, const char *accent) {
-	char css[sizeof(CSS_FORMAT) + 8];
+static void moncell_set_accent(struct moncell *mc) {
+	char css[sizeof(CSS_FORMAT) + 16];
 	GError *err = NULL;
+	const char *acc = (mc->started) ? mc->accent : ACCENT_GRAY;
 
-	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, accent);
+	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, acc, mc->accent);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
@@ -108,10 +116,7 @@ static void moncell_restart_stream(struct moncell *mc) {
 
 static void moncell_update_accent_title(struct moncell *mc) {
 	mc->failed = !mc->started;
-	if (mc->started)
-		moncell_set_accent(mc, mc->accent);
-	else
-		moncell_set_accent(mc, ACCENT_GRAY);
+	moncell_set_accent(mc);
 	moncell_update_title(mc);
 }
 
@@ -208,12 +213,12 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->started = FALSE;
 	mc->failed = TRUE;
 
-	moncell_set_accent(mc, ACCENT_GRAY);
+	moncell_set_accent(mc);
 	moncell_update_title(mc);
-	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 8);
-	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 8);
+	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
+	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
-	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 1);
+	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 0);
 }
 
 static void moncell_destroy(struct moncell *mc) {
