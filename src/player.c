@@ -247,20 +247,11 @@ static void process_play(nstr_t cmd) {
 		char uri[128];
 		char encoding[16];
 		char fname[16];
-		nstr_t d;
 
 		nstr_wrap(cam_id, sizeof(cam_id), p3);
 		nstr_wrap(uri, sizeof(uri), p4);
 		nstr_wrap(encoding, sizeof(encoding), p5);
-		d = nstr_make_cpy(desc, sizeof(desc), 0, p3);
-		if (nstr_len(p6)) {
-			if (strncmp("udp", uri, 3) == 0)
-				nstr_cat_z(&d, " * ");
-			else
-				nstr_cat_z(&d, " | ");
-			nstr_cat(&d, p6);
-		}
-		nstr_z(d);
+		nstr_wrap(desc, sizeof(desc), p6);
 		elog_cmd(cmd);
 		play_stream(mon, cam_id, uri, desc, encoding,
 			parse_latency(p7));

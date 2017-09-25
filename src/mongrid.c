@@ -28,11 +28,11 @@
 #include "lock.h"
 
 struct moncell {
-	struct stream	stream;	/* must be first member, due to casting */
-	char		mid[8];
-	char		accent[8];
-	char		cam_id[20];
-	char		description[64];
+	struct stream	stream;          /* must be first, due to casting */
+	char		mid[8];          /* monitor ID */
+	char		accent[8];       /* accent color for title */
+	char		cam_id[20];      /* camera ID */
+	char		description[64]; /* location description */
 	uint32_t	font_sz;
 	GtkCssProvider	*css_provider;
 	GtkWidget	*box;
@@ -40,6 +40,7 @@ struct moncell {
 	GtkWidget	*title;
 	GtkWidget	*mon_lbl;
 	GtkWidget	*cam_lbl;
+	GtkWidget	*desc_lbl;
 	gboolean	started;
 	gboolean        failed;
 };
@@ -84,11 +85,12 @@ static const char CSS_FORMAT[] =
 	"label {"
 		"padding-left: 8px; "
 		"padding-right: 8px; "
+		"border-right: solid 1px white; "
 	"}\n"
 	"label#mon_lbl {"
 		"color: #FFFF88; "
 		"background-color: #%s; "
-		"border-right: solid 1px white; "
+		"border-left: solid 1px white; "
 	"}\n";
 
 static void moncell_set_accent(struct moncell *mc) {
@@ -104,7 +106,8 @@ static void moncell_set_accent(struct moncell *mc) {
 
 static void moncell_update_title(struct moncell *mc) {
 	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
-	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->description);
+	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
+	gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
 }
 
 static void moncell_restart_stream(struct moncell *mc) {
@@ -210,12 +213,14 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->mon_lbl = create_label(mc, 6);
 	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
 	mc->cam_lbl = create_label(mc, 0);
+	mc->desc_lbl = create_label(mc, 0);
 	mc->started = FALSE;
 	mc->failed = TRUE;
 
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
+	gtk_box_pack_end(GTK_BOX(mc->title), mc->desc_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 0);
@@ -225,6 +230,7 @@ static void moncell_destroy(struct moncell *mc) {
 	stream_destroy(&mc->stream);
 	gtk_widget_destroy(mc->mon_lbl);
 	gtk_widget_destroy(mc->cam_lbl);
+	gtk_widget_destroy(mc->desc_lbl);
 	gtk_widget_destroy(mc->video);
 	gtk_widget_destroy(mc->title);
 	gtk_widget_destroy(mc->box);
