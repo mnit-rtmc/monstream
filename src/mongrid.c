@@ -76,7 +76,6 @@ static const char CSS_FORMAT[] =
 		"color: #FFFFFF; "
 		"font-family: Cantarell; "
 		"font-size: %upt; "
-		"font-weight: Bold "
 	"}\n"
 	"box.title { "
 		"margin-top: 1px; "
@@ -90,7 +89,11 @@ static const char CSS_FORMAT[] =
 	"label#mon_lbl {"
 		"color: #FFFF88; "
 		"background-color: #%s; "
+		"font-weight: Bold; "
 		"border-left: solid 1px white; "
+	"}\n"
+	"label#cam_lbl {"
+		"font-weight: Bold; "
 	"}\n";
 
 static void moncell_set_accent(struct moncell *mc) {
@@ -213,6 +216,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->mon_lbl = create_label(mc, 6);
 	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
 	mc->cam_lbl = create_label(mc, 0);
+	gtk_widget_set_name(mc->cam_lbl, "cam_lbl");
 	mc->desc_lbl = create_label(mc, 0);
 	mc->started = FALSE;
 	mc->failed = TRUE;
