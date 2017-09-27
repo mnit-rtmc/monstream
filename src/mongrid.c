@@ -103,9 +103,10 @@ static const char CSS_FORMAT[] =
 static void moncell_set_accent(struct moncell *mc) {
 	char css[sizeof(CSS_FORMAT) + 16];
 	GError *err = NULL;
-	const char *acc = (mc->started) ? mc->accent : ACCENT_GRAY;
+	const char *a0 = (strlen(mc->accent) > 0) ? mc->accent : ACCENT_GRAY;
+	const char *a1 = (mc->started) ? a0 : ACCENT_GRAY;
 
-	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, acc, mc->accent);
+	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, a1, a0);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
