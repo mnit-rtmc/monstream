@@ -39,6 +39,7 @@ struct moncell {
 	GtkWidget	*video;
 	GtkWidget	*title;
 	GtkWidget	*mon_lbl;
+	GtkWidget	*spc_lbl;
 	GtkWidget	*cam_lbl;
 	GtkWidget	*desc_lbl;
 	gboolean	started;
@@ -91,6 +92,9 @@ static const char CSS_FORMAT[] =
 		"background-color: #%s; "
 		"font-weight: Bold; "
 		"border-left: solid 1px white; "
+	"}\n"
+	"label#spc_lbl {"
+		"background-color: #808080; "
 	"}\n"
 	"label#cam_lbl {"
 		"font-weight: Bold; "
@@ -215,6 +219,8 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->title = create_title(mc);
 	mc->mon_lbl = create_label(mc, 6);
 	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
+	mc->spc_lbl = create_label(mc, 0);
+	gtk_widget_set_name(mc->spc_lbl, "spc_lbl");
 	mc->cam_lbl = create_label(mc, 0);
 	gtk_widget_set_name(mc->cam_lbl, "cam_lbl");
 	mc->desc_lbl = create_label(mc, 0);
@@ -224,6 +230,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(mc->title), mc->spc_lbl, TRUE, TRUE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->desc_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
@@ -233,6 +240,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 static void moncell_destroy(struct moncell *mc) {
 	stream_destroy(&mc->stream);
 	gtk_widget_destroy(mc->mon_lbl);
+	gtk_widget_destroy(mc->spc_lbl);
 	gtk_widget_destroy(mc->cam_lbl);
 	gtk_widget_destroy(mc->desc_lbl);
 	gtk_widget_destroy(mc->video);
