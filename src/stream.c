@@ -72,15 +72,18 @@ static void stream_add(struct stream *st, GstElement *elem) {
 		elog_err("Element not added to pipeline\n");
 }
 
-static void stream_add_sink(struct stream *st) {
-#if 1
+static GstElement* stream_create_xvimagesink(struct stream *st) {
 	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, st->handle);
 	g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect, NULL);
-#else
-	GstElement *sink = gst_element_factory_make("fakesink", NULL);
-#endif
+	return sink;
+}
+
+static void stream_add_sink(struct stream *st) {
+	GstElement *sink = (st->handle)
+	      ? stream_create_xvimagesink(st)
+	      : gst_element_factory_make("fakesink", NULL);
 	stream_add(st, sink);
 }
 

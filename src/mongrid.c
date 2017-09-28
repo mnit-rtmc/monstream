@@ -163,7 +163,8 @@ static gboolean do_restart(gpointer data) {
 
 static void moncell_stop_stream(struct moncell *mc, guint delay) {
 	mc->started = FALSE;
-	g_timeout_add(0, do_update_title, mc);
+	if (grid.window)
+		g_timeout_add(0, do_update_title, mc);
 	g_timeout_add(0, do_stop_stream, mc);
 	/* delay is needed to allow gtk+ to update accent color */
 	g_timeout_add(delay, do_restart, mc);
@@ -205,15 +206,7 @@ static GtkWidget *create_label(struct moncell *mc, int n_chars) {
 	return lbl;
 }
 
-static void moncell_init(struct moncell *mc, uint32_t idx) {
-	stream_init(&mc->stream, idx, &grid.lock);
-	mc->stream.do_stop = moncell_stop;
-	mc->stream.ack_started = moncell_ack_started;
-	memset(mc->mid, 0, sizeof(mc->mid));
-	memset(mc->accent, 0, sizeof(mc->accent));
-	memset(mc->cam_id, 0, sizeof(mc->cam_id));
-	memset(mc->description, 0, sizeof(mc->description));
-	mc->font_sz = 32;
+static void moncell_init_gtk(struct moncell *mc) {
 	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
@@ -225,9 +218,6 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->cam_lbl = create_label(mc, 0);
 	gtk_widget_set_name(mc->cam_lbl, "cam_lbl");
 	mc->desc_lbl = create_label(mc, 0);
-	mc->started = FALSE;
-	mc->failed = TRUE;
-
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
@@ -238,15 +228,30 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 0);
 }
 
+static void moncell_init(struct moncell *mc, uint32_t idx) {
+	memset(mc, 0, sizeof(struct moncell));
+	stream_init(&mc->stream, idx, &grid.lock);
+	mc->stream.do_stop = moncell_stop;
+	if (grid.window)
+		mc->stream.ack_started = moncell_ack_started;
+	mc->font_sz = 32;
+	if (grid.window)
+		moncell_init_gtk(mc);
+	mc->started = FALSE;
+	mc->failed = TRUE;
+}
+
 static void moncell_destroy(struct moncell *mc) {
 	stream_destroy(&mc->stream);
-	gtk_widget_destroy(mc->mon_lbl);
-	gtk_widget_destroy(mc->spc_lbl);
-	gtk_widget_destroy(mc->cam_lbl);
-	gtk_widget_destroy(mc->desc_lbl);
-	gtk_widget_destroy(mc->video);
-	gtk_widget_destroy(mc->title);
-	gtk_widget_destroy(mc->box);
+	if (grid.window) {
+		gtk_widget_destroy(mc->mon_lbl);
+		gtk_widget_destroy(mc->spc_lbl);
+		gtk_widget_destroy(mc->cam_lbl);
+		gtk_widget_destroy(mc->desc_lbl);
+		gtk_widget_destroy(mc->video);
+		gtk_widget_destroy(mc->title);
+		gtk_widget_destroy(mc->box);
+	}
 }
 
 static void moncell_set_handle(struct moncell *mc) {
@@ -276,7 +281,8 @@ static void moncell_set_mon(struct moncell *mc, const char *mid,
 	strncpy(mc->accent, accent, sizeof(mc->accent));
 	stream_set_aspect(&mc->stream, aspect);
 	mc->font_sz = font_sz;
-	g_timeout_add(0, do_update_title, mc);
+	if (grid.window)
+		g_timeout_add(0, do_update_title, mc);
 }
 
 static void mongrid_set_handles(void) {
@@ -333,19 +339,42 @@ static gboolean do_stats(gpointer data) {
 	return TRUE;
 }
 
-void mongrid_create(void) {
+void mongrid_create(bool gui, bool stats) {
 	GtkWidget *window;
 
 	gst_init(NULL, NULL);
-	gtk_init(NULL, NULL);
 	lock_init(&grid.lock);
-	window = gtk_window_new(0);
-	grid.window = window;
-	gtk_window_set_title((GtkWindow *) window, "MonStream");
-	gtk_window_fullscreen((GtkWindow *) window);
-	gtk_widget_realize(window);
-	hide_cursor(window);
-	g_timeout_add(2000, do_stats, NULL);
+	if (gui) {
+		gtk_init(NULL, NULL);
+		window = gtk_window_new(0);
+		grid.window = window;
+		gtk_window_set_title((GtkWindow *) window, "MonStream");
+		gtk_window_fullscreen((GtkWindow *) window);
+		gtk_widget_realize(window);
+		hide_cursor(window);
+	} else
+		grid.window = NULL;
+	if (stats)
+		g_timeout_add(2000, do_stats, NULL);
+}
+
+static void mongrid_init_gtk(void) {
+	grid.grid = (GtkGrid *) gtk_grid_new();
+	gtk_grid_set_column_spacing(grid.grid, 4);
+	gtk_grid_set_row_spacing(grid.grid, 4);
+	gtk_grid_set_column_homogeneous(grid.grid, TRUE);
+	gtk_grid_set_row_homogeneous(grid.grid, TRUE);
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct moncell *mc = grid.cells + i;
+			gtk_grid_attach(grid.grid, mc->box, c, r, 1, 1);
+		}
+	}
+	gtk_container_add(GTK_CONTAINER(grid.window), (GtkWidget *) grid.grid);
+	gtk_widget_show_all(grid.window);
+	gtk_widget_realize(grid.window);
+	mongrid_set_handles();
 }
 
 int32_t mongrid_init(uint32_t num) {
@@ -360,23 +389,15 @@ int32_t mongrid_init(uint32_t num) {
 	grid.cols = get_cols(num);
 	num = grid.rows * grid.cols;
 	grid.cells = calloc(num, sizeof(struct moncell));
-	grid.grid = (GtkGrid *) gtk_grid_new();
-	gtk_grid_set_column_spacing(grid.grid, 4);
-	gtk_grid_set_row_spacing(grid.grid, 4);
-	gtk_grid_set_column_homogeneous(grid.grid, TRUE);
-	gtk_grid_set_row_homogeneous(grid.grid, TRUE);
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
 			struct moncell *mc = grid.cells + i;
 			moncell_init(mc, i);
-			gtk_grid_attach(grid.grid, mc->box, c, r, 1, 1);
 		}
 	}
-	gtk_container_add(GTK_CONTAINER(grid.window), (GtkWidget *) grid.grid);
-	gtk_widget_show_all(grid.window);
-	gtk_widget_realize(grid.window);
-	mongrid_set_handles();
+	if (grid.window)
+		mongrid_init_gtk();
 	lock_release(&grid.lock, __func__);
 	return 0;
 err:
@@ -397,8 +418,10 @@ void mongrid_clear(void) {
 	grid.cells = NULL;
 	grid.rows = 0;
 	grid.cols = 0;
-	gtk_container_remove(GTK_CONTAINER(grid.window),
-		(GtkWidget *) grid.grid);
+	if (grid.window) {
+		gtk_container_remove(GTK_CONTAINER(grid.window),
+			(GtkWidget *) grid.grid);
+	}
 	lock_release(&grid.lock, __func__);
 }
 
@@ -428,7 +451,8 @@ void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
 
 void mongrid_destroy(void) {
 	mongrid_clear();
-	gtk_widget_destroy(grid.window);
+	if (grid.window)
+		gtk_widget_destroy(grid.window);
 	grid.window = NULL;
 	lock_destroy(&grid.lock);
 }

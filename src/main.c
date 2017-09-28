@@ -12,18 +12,32 @@
  * GNU General Public License for more details.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <curl/curl.h>
 
-#define VERSION "0.20"
+#define VERSION "0.21"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
 
-void run_player(void);
+void run_player(bool gui, bool stats);
 
-int main(void) {
+int main(int argc, char* argv[]) {
+	int i;
+	bool gui = true;
+	bool stats = false;
+
 	printf(BANNER);
 	curl_global_init(CURL_GLOBAL_ALL);
-	run_player();
+	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--no-gui") == 0)
+			gui = false;
+		else if (strcmp(argv[i], "--stats") == 0)
+			stats = true;
+		else
+			printf("Invalid option: %s\n", argv[i]);
+	}
+	run_player(gui, stats);
 	curl_global_cleanup();
 	return 1;
 }

@@ -35,7 +35,7 @@ const char *PEER = "tms-iris.dot.state.mn.us";
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-void mongrid_create(void);
+void mongrid_create(bool gui, bool stats);
 int32_t mongrid_init(uint32_t num);
 void mongrid_clear(void);
 void mongrid_destroy(void);
@@ -470,8 +470,8 @@ static bool create_thread(void *(func)(void *)) {
 	return !rc;
 }
 
-void run_player(void) {
-	mongrid_create();
+void run_player(bool gui, bool stats) {
+	mongrid_create(gui, stats);
 	config_init();
 	lock_init(&peer_h.lock);
 	peer_h.len = 0;
