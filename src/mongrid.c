@@ -258,6 +258,7 @@ static void moncell_play_stream(struct moncell *mc, const char *cam_id,
 	const char *loc, const char *desc, const char *encoding,
 	uint32_t latency, const char *sprops)
 {
+	stream_set_id(&mc->stream, cam_id);
 	stream_set_location(&mc->stream, loc);
 	stream_set_encoding(&mc->stream, encoding);
 	stream_set_latency(&mc->stream, latency);
@@ -319,6 +320,19 @@ static void hide_cursor(GtkWidget *window) {
 	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
 }
 
+static gboolean do_stats(gpointer data) {
+	lock_acquire(&grid.lock, __func__);
+	for (uint32_t r = 0; r < grid.rows; r++) {
+		for (uint32_t c = 0; c < grid.cols; c++) {
+			uint32_t i = r * grid.cols + c;
+			struct moncell *mc = grid.cells + i;
+			stream_stats(&mc->stream);
+		}
+	}
+	lock_release(&grid.lock, __func__);
+	return TRUE;
+}
+
 void mongrid_create(void) {
 	GtkWidget *window;
 
@@ -331,6 +345,7 @@ void mongrid_create(void) {
 	gtk_window_fullscreen((GtkWindow *) window);
 	gtk_widget_realize(window);
 	hide_cursor(window);
+	g_timeout_add(2000, do_stats, NULL);
 }
 
 int32_t mongrid_init(uint32_t num) {

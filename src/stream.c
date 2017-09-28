@@ -73,10 +73,14 @@ static void stream_add(struct stream *st, GstElement *elem) {
 }
 
 static void stream_add_sink(struct stream *st) {
+#if 1
 	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, st->handle);
 	g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect, NULL);
+#else
+	GstElement *sink = gst_element_factory_make("fakesink", NULL);
+#endif
 	stream_add(st, sink);
 }
 
@@ -101,6 +105,7 @@ static void stream_add_jitter(struct stream *st) {
 	g_object_set(G_OBJECT(jtr), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(jtr), "max-dropout-time", 1500, NULL);
 	stream_add(st, jtr);
+	st->jitter = jtr;
 }
 
 static GstCaps *create_caps_mpeg2(void) {
@@ -252,6 +257,7 @@ static void stream_remove_all(struct stream *st) {
 			gst_bin_remove(bin, st->elem[i]);
 	}
 	memset(st->elem, 0, sizeof(st->elem));
+	st->jitter = NULL;
 }
 
 static void stream_stop_pipeline(struct stream *st) {
@@ -342,6 +348,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 
 	st->lock = lock;
 	snprintf(name, 8, "m%d", idx);
+	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
@@ -352,6 +359,8 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
 	gst_bus_add_watch(st->bus, bus_cb, st);
 	memset(st->elem, 0, sizeof(st->elem));
+	st->jitter = NULL;
+	st->lost = 0;
 	st->do_stop = NULL;
 	st->ack_started = NULL;
 }
@@ -372,6 +381,10 @@ void stream_set_aspect(struct stream *st, gboolean aspect) {
 	st->aspect = aspect;
 }
 
+void stream_set_id(struct stream *st, const char *cam_id) {
+	strncpy(st->cam_id, cam_id, sizeof(st->cam_id));
+}
+
 void stream_set_location(struct stream *st, const char *loc) {
 	strncpy(st->location, loc, sizeof(st->location));
 }
@@ -386,6 +399,31 @@ void stream_set_sprops(struct stream *st, const char *sprops) {
 
 void stream_set_latency(struct stream *st, uint32_t latency) {
 	st->latency = latency;
+}
+
+static guint64 stream_lost_pkts(struct stream *st) {
+	if (st->jitter) {
+		GstStructure *stats;
+		g_object_get(st->jitter, "stats", &stats, NULL);
+		if (stats) {
+			guint64 lost;
+			gboolean r = gst_structure_get_uint64(stats, "num-lost",
+			        &lost);
+			gst_structure_free(stats);
+			if (r)
+				return lost;
+		}
+	}
+	return 0;
+}
+
+void stream_stats(struct stream *st) {
+	guint64 lost = stream_lost_pkts(st);
+	if (lost != st->lost) {
+		elog_err("stats %s: %" G_GUINT64_FORMAT " lost pkts\n",
+			st->cam_id, lost);
+		st->lost = lost;
+	}
 }
 
 void stream_start(struct stream *st) {
