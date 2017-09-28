@@ -420,13 +420,14 @@ static guint64 stream_lost_pkts(struct stream *st) {
 	return 0;
 }
 
-void stream_stats(struct stream *st) {
+guint64 stream_stats(struct stream *st) {
 	guint64 lost = stream_lost_pkts(st);
 	if (lost != st->lost) {
 		elog_err("stats %s: %" G_GUINT64_FORMAT " lost pkts\n",
 			st->cam_id, lost);
 		st->lost = lost;
 	}
+	return lost;
 }
 
 void stream_start(struct stream *st) {

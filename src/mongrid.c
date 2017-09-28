@@ -39,7 +39,7 @@ struct moncell {
 	GtkWidget	*video;
 	GtkWidget	*title;
 	GtkWidget	*mon_lbl;
-	GtkWidget	*spc_lbl;
+	GtkWidget	*stat_lbl;
 	GtkWidget	*cam_lbl;
 	GtkWidget	*desc_lbl;
 	gboolean	started;
@@ -93,7 +93,8 @@ static const char CSS_FORMAT[] =
 		"font-weight: Bold; "
 		"border-left: solid 1px white; "
 	"}\n"
-	"label#spc_lbl {"
+	"label#stat_lbl {"
+		"color: #882222; "
 		"background-color: #808080; "
 	"}\n"
 	"label#cam_lbl {"
@@ -213,15 +214,15 @@ static void moncell_init_gtk(struct moncell *mc) {
 	mc->title = create_title(mc);
 	mc->mon_lbl = create_label(mc, 6);
 	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
-	mc->spc_lbl = create_label(mc, 0);
-	gtk_widget_set_name(mc->spc_lbl, "spc_lbl");
+	mc->stat_lbl = create_label(mc, 0);
+	gtk_widget_set_name(mc->stat_lbl, "stat_lbl");
 	mc->cam_lbl = create_label(mc, 0);
 	gtk_widget_set_name(mc->cam_lbl, "cam_lbl");
 	mc->desc_lbl = create_label(mc, 0);
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(mc->title), mc->spc_lbl, TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(mc->title), mc->stat_lbl, TRUE, TRUE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->desc_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
@@ -245,7 +246,7 @@ static void moncell_destroy(struct moncell *mc) {
 	stream_destroy(&mc->stream);
 	if (grid.window) {
 		gtk_widget_destroy(mc->mon_lbl);
-		gtk_widget_destroy(mc->spc_lbl);
+		gtk_widget_destroy(mc->stat_lbl);
 		gtk_widget_destroy(mc->cam_lbl);
 		gtk_widget_destroy(mc->desc_lbl);
 		gtk_widget_destroy(mc->video);
@@ -326,13 +327,21 @@ static void hide_cursor(GtkWidget *window) {
 	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
 }
 
+static void moncell_update_stats(struct moncell *mc, guint64 lost) {
+	char buf[16];
+	snprintf(buf, sizeof(buf), "%" G_GUINT64_FORMAT, lost);
+	gtk_label_set_text(GTK_LABEL(mc->stat_lbl), buf);
+}
+
 static gboolean do_stats(gpointer data) {
 	lock_acquire(&grid.lock, __func__);
 	for (uint32_t r = 0; r < grid.rows; r++) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
 			struct moncell *mc = grid.cells + i;
-			stream_stats(&mc->stream);
+			guint64 lost = stream_stats(&mc->stream);
+			if (grid.window)
+				moncell_update_stats(mc, lost);
 		}
 	}
 	lock_release(&grid.lock, __func__);
@@ -355,7 +364,7 @@ void mongrid_create(bool gui, bool stats) {
 	} else
 		grid.window = NULL;
 	if (stats)
-		g_timeout_add(2000, do_stats, NULL);
+		g_timeout_add(1000, do_stats, NULL);
 }
 
 static void mongrid_init_gtk(void) {
