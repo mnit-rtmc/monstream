@@ -16,7 +16,6 @@
 #include <curl/curl.h>
 #include <errno.h>
 #include <gst/sdp/sdp.h>
-#include <gtk/gtk.h>
 #include <netdb.h>		/* for socket stuff */
 #define _MULTI_THREADED
 #include <pthread.h>
@@ -24,6 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>		/* for memset */
+#include <unistd.h>
 #include "elog.h"
 #include "nstr.h"
 #include "lock.h"
@@ -37,6 +37,8 @@ static const char UNIT_SEP = '\x1F';
 
 void mongrid_create(bool gui, bool stats);
 int32_t mongrid_init(uint32_t num);
+void mongrid_run(void);
+void mongrid_restart(void);
 void mongrid_clear(void);
 void mongrid_destroy(void);
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
@@ -295,7 +297,7 @@ static void process_monitor(nstr_t cmd) {
 static void process_config(nstr_t cmd) {
 	elog_cmd(cmd);
 	config_store("config", cmd);
-	gtk_main_quit();
+	mongrid_restart();
 }
 
 static void process_command(nstr_t cmd) {
@@ -484,7 +486,7 @@ void run_player(bool gui, bool stats) {
 		if (mongrid_init(mon))
 			break;
 		load_commands(mon);
-		gtk_main();
+		mongrid_run();
 		mongrid_clear();
 	}
 fail:

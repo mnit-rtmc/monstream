@@ -53,6 +53,7 @@ struct mongrid {
 	uint32_t	rows;
 	uint32_t	cols;
 	struct moncell	*cells;
+	bool		running;
 };
 
 static struct mongrid grid;
@@ -407,11 +408,39 @@ int32_t mongrid_init(uint32_t num) {
 	}
 	if (grid.window)
 		mongrid_init_gtk();
+	grid.running = false;
 	lock_release(&grid.lock, __func__);
 	return 0;
 err:
 	lock_release(&grid.lock, __func__);
 	return 1;
+}
+
+void mongrid_run(void) {
+	lock_acquire(&grid.lock, __func__);
+	grid.running = true;
+	lock_release(&grid.lock, __func__);
+	gtk_main();
+}
+
+static bool mongrid_is_running(void) {
+	bool running = false;
+	lock_acquire(&grid.lock, __func__);
+	running = grid.running;
+	lock_release(&grid.lock, __func__);
+	return running;
+}
+
+void mongrid_restart(void) {
+	lock_acquire(&grid.lock, __func__);
+	grid.running = false;
+	lock_release(&grid.lock, __func__);
+	gtk_main_quit();
+	while (true) {
+		if (mongrid_is_running())
+			break;
+		sleep(1);
+	}
 }
 
 void mongrid_clear(void) {
