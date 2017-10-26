@@ -115,6 +115,11 @@ static void moncell_set_accent(struct moncell *mc) {
 }
 
 static void moncell_update_title(struct moncell *mc) {
+	/* Hide titlebar when monitor ID is blank */
+	if (strlen(mc->mid))
+		gtk_widget_show_all(mc->title);
+	else
+		gtk_widget_hide(mc->title);
 	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
 	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
 	gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
