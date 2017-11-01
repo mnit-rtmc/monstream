@@ -118,8 +118,10 @@ static void moncell_update_title(struct moncell *mc) {
 	/* Hide titlebar when monitor ID is blank */
 	if (strlen(mc->mid))
 		gtk_widget_show_all(mc->title);
-	else
+	else {
 		gtk_widget_hide(mc->title);
+		stream_set_description(&mc->stream, mc->description);
+	}
 	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
 	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
 	gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
@@ -287,6 +289,7 @@ static void moncell_set_mon(struct moncell *mc, const char *mid,
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	strncpy(mc->accent, accent, sizeof(mc->accent));
 	stream_set_aspect(&mc->stream, aspect);
+	stream_set_font_size(&mc->stream, font_sz);
 	mc->font_sz = font_sz;
 	if (grid.window)
 		g_timeout_add(0, do_update_title, mc);

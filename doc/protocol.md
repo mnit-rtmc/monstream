@@ -14,7 +14,7 @@ Commands are separated by ASCII record separator (30).
 
 1. monitor
 2. Monitor index (0 to 15)
-3. Monitor ID
+3. Monitor ID (blank for overlay mode)
 4. Accent color (rgb hex: 000000 -> black)
 5. Force-aspect-ratio (0 or 1)
 6. Font size (pt)

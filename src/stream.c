@@ -87,6 +87,24 @@ static void stream_add_sink(struct stream *st) {
 	stream_add(st, sink);
 }
 
+static void stream_add_text(struct stream *st) {
+	char font[32];
+	snprintf(font, sizeof(font), "Cantarell, %d", st->font_sz);
+	GstElement *txt = gst_element_factory_make("textoverlay", NULL);
+	g_object_set(G_OBJECT(txt), "text", st->description, NULL);
+	g_object_set(G_OBJECT(txt), "font-desc", font, NULL);
+	g_object_set(G_OBJECT(txt), "shaded-background", TRUE, NULL);
+	g_object_set(G_OBJECT(txt), "shading-value", 144, NULL);
+	g_object_set(G_OBJECT(txt), "color", 0xFFFFFFE0, NULL);
+	g_object_set(G_OBJECT(txt), "halignment", 0, NULL); // left
+	g_object_set(G_OBJECT(txt), "valignment", 2, NULL); // top
+	g_object_set(G_OBJECT(txt), "wrap-mode", -1, NULL); // no wrapping
+	g_object_set(G_OBJECT(txt), "xpad", 48, NULL);
+	g_object_set(G_OBJECT(txt), "ypad", 36, NULL);
+	stream_add(st, txt);
+	st->txt = txt;
+}
+
 static void stream_add_videobox(struct stream *st) {
 	GstElement *vbx = gst_element_factory_make("videobox", NULL);
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
@@ -193,6 +211,7 @@ static void stream_add_src_rtsp(struct stream *st) {
 
 static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
+	stream_add_text(st);
 	stream_add_videobox(st);
 	if (strcmp("MPEG2", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
@@ -260,6 +279,7 @@ static void stream_remove_all(struct stream *st) {
 			gst_bin_remove(bin, st->elem[i]);
 	}
 	memset(st->elem, 0, sizeof(st->elem));
+	st->txt = NULL;
 	st->jitter = NULL;
 }
 
@@ -355,13 +375,16 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
+	memset(st->description, 0, sizeof(st->description));
 	st->latency = DEFAULT_LATENCY;
+	st->font_sz = 22;
 	st->handle = 0;
 	st->aspect = FALSE;
 	st->pipeline = gst_pipeline_new(name);
 	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
 	gst_bus_add_watch(st->bus, bus_cb, st);
 	memset(st->elem, 0, sizeof(st->elem));
+	st->txt = NULL;
 	st->jitter = NULL;
 	st->lost = 0;
 	st->do_stop = NULL;
@@ -402,6 +425,14 @@ void stream_set_sprops(struct stream *st, const char *sprops) {
 
 void stream_set_latency(struct stream *st, uint32_t latency) {
 	st->latency = latency;
+}
+
+void stream_set_description(struct stream *st, const char *desc) {
+	strncpy(st->description, desc, sizeof(st->description));
+}
+
+void stream_set_font_size(struct stream *st, uint32_t sz) {
+	st->font_sz = sz;
 }
 
 static guint64 stream_lost_pkts(struct stream *st) {
