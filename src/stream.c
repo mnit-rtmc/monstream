@@ -159,15 +159,6 @@ static void stream_add_filter(struct stream *st) {
 	stream_add(st, fltr);
 }
 
-#if USE_BUGGY_SDPDEMUX
-static void stream_add_sdp_demux(struct stream *st) {
-	GstElement *sdp = gst_element_factory_make("sdpdemux", NULL);
-	g_object_set(G_OBJECT(sdp), "latency", st->latency, NULL);
-	g_object_set(G_OBJECT(sdp), "timeout", ONE_SEC_US, NULL);
-	stream_add(st, sdp);
-}
-#endif
-
 static void stream_add_src_blank(struct stream *st) {
 	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
 	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BLACK, NULL);
@@ -240,26 +231,14 @@ static void stream_add_udp_pipe(struct stream *st) {
 	stream_add_src_udp(st);
 }
 
-static void stream_add_http_pipe(struct stream *st) {
-#if USE_BUGGY_SDPDEMUX
-	if (strcmp("PNG", st->encoding) != 0)
-		stream_add_sdp_demux(st);
-#endif
-	stream_add_src_http(st);
-}
-
-static void stream_add_rtsp_pipe(struct stream *st) {
-	stream_add_src_rtsp(st);
-}
-
 static void stream_start_pipeline(struct stream *st) {
 	stream_add_later_elements(st);
 	if (strncmp("udp", st->location, 3) == 0)
 		stream_add_udp_pipe(st);
 	else if (strncmp("http", st->location, 4) == 0)
-		stream_add_http_pipe(st);
+		stream_add_src_http(st);
 	else if (strncmp("rtsp", st->location, 4) == 0)
-		stream_add_rtsp_pipe(st);
+		stream_add_src_rtsp(st);
 	else {
 		elog_err("Invalid location: %s\n", st->location);
 		return;
