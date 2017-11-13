@@ -89,12 +89,11 @@ static void stream_add_sink(struct stream *st) {
 
 static void stream_add_text(struct stream *st) {
 	char font[32];
-	snprintf(font, sizeof(font), "Cantarell, %d", st->font_sz);
+	snprintf(font, sizeof(font), "Overpass, Bold %d", st->font_sz);
 	GstElement *txt = gst_element_factory_make("textoverlay", NULL);
 	g_object_set(G_OBJECT(txt), "text", st->description, NULL);
 	g_object_set(G_OBJECT(txt), "font-desc", font, NULL);
-	g_object_set(G_OBJECT(txt), "shaded-background", TRUE, NULL);
-	g_object_set(G_OBJECT(txt), "shading-value", 144, NULL);
+	g_object_set(G_OBJECT(txt), "shaded-background", FALSE, NULL);
 	g_object_set(G_OBJECT(txt), "color", 0xFFFFFFE0, NULL);
 	g_object_set(G_OBJECT(txt), "halignment", 0, NULL); // left
 	g_object_set(G_OBJECT(txt), "valignment", 2, NULL); // top
