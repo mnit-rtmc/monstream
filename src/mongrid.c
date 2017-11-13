@@ -48,6 +48,7 @@ struct moncell {
 
 struct mongrid {
 	struct lock	lock;
+	bool		stats;
 	GtkWidget	*window;
 	GtkGrid		*grid;
 	uint32_t	rows;
@@ -76,7 +77,7 @@ static void moncell_set_description(struct moncell *mc, const char *desc) {
 static const char CSS_FORMAT[] =
 	"* { "
 		"color: #FFFFFF; "
-		"font-family: Cantarell; "
+		"font-family: Overpass; "
 		"font-size: %upt; "
 	"}\n"
 	"box.title { "
@@ -94,21 +95,25 @@ static const char CSS_FORMAT[] =
 		"font-weight: Bold; "
 		"border-left: solid 1px white; "
 	"}\n"
-	"label#stat_lbl {"
-		"color: #882222; "
-		"background-color: #808080; "
-	"}\n"
 	"label#cam_lbl {"
 		"font-weight: Bold; "
 	"}\n";
 
+static const char CSS_STATS[] =
+	"label#stat_lbl {"
+		"color: #882222; "
+		"background-color: #808080; "
+	"}\n";
+
 static void moncell_set_accent(struct moncell *mc) {
-	char css[sizeof(CSS_FORMAT) + 16];
+	char css[sizeof(CSS_FORMAT) + sizeof(CSS_STATS) + 16];
 	GError *err = NULL;
 	const char *a0 = (strlen(mc->accent) > 0) ? mc->accent : ACCENT_GRAY;
 	const char *a1 = (mc->started) ? a0 : ACCENT_GRAY;
 
 	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, a1, a0);
+	if (grid.stats)
+		strncat(css, CSS_STATS, sizeof(css));
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
@@ -362,6 +367,7 @@ void mongrid_create(bool gui, bool stats) {
 
 	gst_init(NULL, NULL);
 	lock_init(&grid.lock);
+	grid.stats = stats;
 	if (gui) {
 		gtk_init(NULL, NULL);
 		window = gtk_window_new(0);
