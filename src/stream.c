@@ -463,7 +463,10 @@ guint64 stream_stats(struct stream *st) {
 void stream_start(struct stream *st) {
 	/* Blank pipeline is probably running -- stop it first */
 	stream_stop_pipeline(st);
-	stream_start_pipeline(st);
+	if (st->location[0])
+		stream_start_pipeline(st);
+	else
+		stream_start_blank(st);
 }
 
 void stream_stop(struct stream *st) {
