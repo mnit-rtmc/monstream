@@ -176,6 +176,8 @@ static void stream_add_src_udp(struct stream *st) {
 static void stream_add_src_http(struct stream *st) {
 	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", st->location, NULL);
+	g_object_set(G_OBJECT(src), "timeout", 2, NULL);
+	g_object_set(G_OBJECT(src), "retries", 0, NULL);
 	stream_add(st, src);
 }
 
