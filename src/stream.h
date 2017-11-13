@@ -14,10 +14,10 @@ struct stream {
 	gboolean	aspect;
 	char		cam_id[20];      /* camera ID */
 	char		location[128];
+	char		description[64];
 	char		encoding[8];
 	char		sprops[64];
 	uint32_t	latency;
-	char		description[64];
 	uint32_t	font_sz;
 	GstElement	*pipeline;
 	GstBus		*bus;
@@ -32,13 +32,10 @@ struct stream {
 void stream_init(struct stream *st, uint32_t idx, struct lock *lock);
 void stream_destroy(struct stream *st);
 void stream_set_handle(struct stream *st, guintptr handle);
-void stream_set_aspect(struct stream *st, gboolean aspect);
+void stream_set_aspect(struct stream *st, bool aspect);
 void stream_set_id(struct stream *st, const char *cam_id);
-void stream_set_location(struct stream *st, const char *loc);
-void stream_set_encoding(struct stream *st, const char *encoding);
-void stream_set_sprops(struct stream *st, const char *sprops);
-void stream_set_latency(struct stream *st, uint32_t latency);
-void stream_set_description(struct stream *st, const char *desc);
+void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
+	const char *desc, const char *encoding, uint32_t latency);
 void stream_set_font_size(struct stream *st, uint32_t sz);
 guint64 stream_stats(struct stream *st);
 void stream_start(struct stream *st);

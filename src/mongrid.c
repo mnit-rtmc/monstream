@@ -66,12 +66,21 @@ static bool is_moncell_valid(struct moncell *mc) {
 
 #define ACCENT_GRAY	"444444"
 
+static bool moncell_has_title(struct moncell *mc) {
+	return mc->mid[0] != '\0';
+}
+
 static void moncell_set_cam_id(struct moncell *mc, const char *cam_id) {
 	strncpy(mc->cam_id, cam_id, sizeof(mc->cam_id));
 }
 
 static void moncell_set_description(struct moncell *mc, const char *desc) {
 	strncpy(mc->description, desc, sizeof(mc->description));
+}
+
+static const char *moncell_get_description(struct moncell *mc) {
+	/* Description used for text overlay -- blank when titlebar shown */
+	return moncell_has_title(mc) ? "" : mc->description;
 }
 
 static const char CSS_FORMAT[] =
@@ -121,15 +130,13 @@ static void moncell_set_accent(struct moncell *mc) {
 
 static void moncell_update_title(struct moncell *mc) {
 	/* Hide titlebar when monitor ID is blank */
-	if (strlen(mc->mid))
+	if (moncell_has_title(mc)) {
+		gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
+		gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
+		gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
 		gtk_widget_show_all(mc->title);
-	else {
+	} else
 		gtk_widget_hide(mc->title);
-		stream_set_description(&mc->stream, mc->description);
-	}
-	gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
-	gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
-	gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
 }
 
 static void moncell_restart_stream(struct moncell *mc) {
@@ -275,21 +282,18 @@ static void moncell_set_handle(struct moncell *mc) {
 
 static void moncell_play_stream(struct moncell *mc, const char *cam_id,
 	const char *loc, const char *desc, const char *encoding,
-	uint32_t latency, const char *sprops)
+	uint32_t latency)
 {
-	stream_set_id(&mc->stream, cam_id);
-	stream_set_location(&mc->stream, loc);
-	stream_set_encoding(&mc->stream, encoding);
-	stream_set_latency(&mc->stream, latency);
-	stream_set_sprops(&mc->stream, sprops);
 	moncell_set_cam_id(mc, cam_id);
 	moncell_set_description(mc, desc);
+	stream_set_params(&mc->stream, cam_id, loc, moncell_get_description(mc),
+		encoding, latency);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 }
 
 static void moncell_set_mon(struct moncell *mc, const char *mid,
-	const char *accent, gboolean aspect, uint32_t font_sz)
+	const char *accent, bool aspect, uint32_t font_sz)
 {
 	strncpy(mc->mid, mid, sizeof(mc->mid));
 	strncpy(mc->accent, accent, sizeof(mc->accent));
@@ -478,7 +482,7 @@ void mongrid_clear(void) {
 }
 
 void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
-	gboolean aspect, uint32_t font_sz)
+	bool aspect, uint32_t font_sz)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.rows * grid.cols) {
@@ -489,14 +493,12 @@ void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 }
 
 void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
-	const char *desc, const char *encoding, uint32_t latency,
-	const char *sprops)
+	const char *desc, const char *encoding, uint32_t latency)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.rows * grid.cols) {
 		struct moncell *mc = grid.cells + idx;
-		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency,
-			sprops);
+		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency);
 	}
 	lock_release(&grid.lock, __func__);
 }
