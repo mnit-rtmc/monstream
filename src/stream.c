@@ -243,13 +243,25 @@ static void stream_add_udp_pipe(struct stream *st) {
 	stream_add_src_udp(st);
 }
 
+static bool stream_is_udp(const struct stream *st) {
+	return strncmp("udp://", st->location, 6) == 0;
+}
+
+static bool stream_is_http(const struct stream *st) {
+	return strncmp("http://", st->location, 7) == 0;
+}
+
+static bool stream_is_rtsp(const struct stream *st) {
+	return strncmp("rtsp://", st->location, 7) == 0;
+}
+
 static void stream_start_pipeline(struct stream *st) {
 	stream_add_later_elements(st);
-	if (strncmp("udp", st->location, 3) == 0)
+	if (stream_is_udp(st))
 		stream_add_udp_pipe(st);
-	else if (strncmp("http", st->location, 4) == 0)
+	else if (stream_is_http(st))
 		stream_add_src_http(st);
-	else if (strncmp("rtsp", st->location, 4) == 0)
+	else if (stream_is_rtsp(st))
 		stream_add_src_rtsp(st);
 	else {
 		elog_err("Invalid location: %s\n", st->location);
@@ -442,7 +454,7 @@ guint64 stream_stats(struct stream *st) {
 }
 
 static bool stream_is_sdp(const struct stream *st) {
-	return (strncmp("http://", st->location, 7) == 0)
+	return stream_is_http(st)
 	    && (strstr(st->location, ".sdp") != NULL);
 }
 
