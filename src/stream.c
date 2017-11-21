@@ -173,9 +173,19 @@ static void stream_add_src_udp(struct stream *st) {
 	stream_add(st, src);
 }
 
+static const char *stream_location_http(const struct stream *st) {
+	if (strcmp("PNG", st->encoding) == 0)
+		return st->location;
+	else {
+		/* Use IP address in TEST-NET-1 range to ensure the stream
+		 * will timeout quickly */
+		return "http://192.0.2.1/";
+	}
+}
+
 static void stream_add_src_http(struct stream *st) {
 	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
-	g_object_set(G_OBJECT(src), "location", st->location, NULL);
+	g_object_set(G_OBJECT(src), "location", stream_location_http(st), NULL);
 	g_object_set(G_OBJECT(src), "timeout", 2, NULL);
 	g_object_set(G_OBJECT(src), "retries", 0, NULL);
 	stream_add(st, src);
