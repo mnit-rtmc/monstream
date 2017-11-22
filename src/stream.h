@@ -26,7 +26,7 @@ struct stream {
 	GstElement	*txt;
 	GstElement	*jitter;
 	guint64		lost;
-	uint32_t	n_stops;
+	uint32_t	n_starts;
 	void		(*do_stop)	(struct stream *st);
 	void		(*ack_started)	(struct stream *st);
 };

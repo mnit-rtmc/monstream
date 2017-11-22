@@ -417,7 +417,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->txt = NULL;
 	st->jitter = NULL;
 	st->lost = 0;
-	st->n_stops = 0;
+	st->n_starts = 0;
 	st->do_stop = NULL;
 	st->ack_started = NULL;
 }
@@ -459,7 +459,7 @@ void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = latency;
 	st->loc_hash = fnv_hash(loc, strlen(loc));
-	st->n_stops = 0;
+	st->n_starts = 0;
 }
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
@@ -501,7 +501,7 @@ static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
 }
 
 static int64_t stream_timeout(const struct stream *st) {
-	return (st->n_stops) <= 1 ? 1L : 5L;
+	return (st->n_starts) <= 1 ? 1L : 5L;
 }
 
 static nstr_t stream_get_sdp_http(struct stream *st, nstr_t str) {
@@ -526,7 +526,7 @@ static nstr_t stream_get_sdp_http(struct stream *st, nstr_t str) {
 }
 
 static nstr_t stream_get_sdp(struct stream *st, nstr_t str) {
-	if (st->n_stops == 0) {
+	if (st->n_starts == 0) {
 		str = config_load_cache(st->loc_hash, str);
 	}
 	if (nstr_len(str) == 0) {
@@ -534,6 +534,7 @@ static nstr_t stream_get_sdp(struct stream *st, nstr_t str) {
 		if (nstr_len(str) > 0)
 			config_store_cache(st->loc_hash, str);
 	}
+	st->n_starts++;
 	return str;
 }
 
@@ -616,7 +617,6 @@ void stream_start(struct stream *st) {
 }
 
 void stream_stop(struct stream *st) {
-	st->n_stops++;
 	stream_stop_pipeline(st);
 	stream_start_blank(st);
 }
