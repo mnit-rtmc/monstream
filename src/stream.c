@@ -232,6 +232,20 @@ static bool stream_is_sdp(const struct stream *st) {
 	    && (strstr(st->location, ".sdp") != NULL);
 }
 
+static void stream_add_mpeg4(struct stream *st) {
+	GstElement *dec = gst_element_factory_make("avdec_mpeg4", NULL);
+	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
+	stream_add(st, dec);
+	stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
+}
+
+static void stream_add_h264(struct stream *st) {
+	GstElement *dec = gst_element_factory_make("avdec_h264", NULL);
+	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
+	stream_add(st, dec);
+	stream_add(st, gst_element_factory_make("rtph264depay", NULL));
+}
+
 static void stream_add_png(struct stream *st) {
 	stream_add(st, gst_element_factory_make("imagefreeze", NULL));
 	stream_add(st, gst_element_factory_make("videoconvert", NULL));
@@ -250,11 +264,9 @@ static void stream_add_later_elements(struct stream *st) {
 		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
 		stream_add_queue(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
-		stream_add(st, gst_element_factory_make("avdec_mpeg4", NULL));
-		stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
+		stream_add_mpeg4(st);
 	} else if (strcmp("H264", st->encoding) == 0) {
-		stream_add(st, gst_element_factory_make("avdec_h264", NULL));
-		stream_add(st, gst_element_factory_make("rtph264depay", NULL));
+		stream_add_h264(st);
 	} else if (strcmp("PNG", st->encoding) == 0) {
 		stream_add_png(st);
 	} else
