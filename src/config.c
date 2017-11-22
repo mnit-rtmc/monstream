@@ -22,6 +22,7 @@
 #include "nstr.h"
 #include "lock.h"
 
+#define PATH_LEN	(128)
 static const char *PATH = "/var/lib/monstream/%s";
 
 /* Lock to protect config files */
@@ -36,7 +37,7 @@ void config_destroy(void) {
 }
 
 nstr_t config_load(const char *name, nstr_t str) {
-	char path[64];
+	char path[PATH_LEN];
 	int fd;
 
 	lock_acquire(&_lock, __func__);
@@ -68,7 +69,7 @@ err:
 }
 
 ssize_t config_store(const char *name, nstr_t cmd) {
-	char path[64];
+	char path[PATH_LEN];
 	int fd;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
