@@ -214,11 +214,36 @@ static void stream_add_src_rtsp(struct stream *st) {
 	stream_add(st, src);
 }
 
+static bool stream_is_udp(const struct stream *st) {
+	return strncmp("udp://", st->location, 6) == 0;
+}
+
+static bool stream_is_http(const struct stream *st) {
+	return strncmp("http://", st->location, 7) == 0;
+}
+
+static bool stream_is_rtsp(const struct stream *st) {
+	return strncmp("rtsp://", st->location, 7) == 0;
+}
+
+static bool stream_is_sdp(const struct stream *st) {
+	return stream_is_http(st)
+	    && (strstr(st->location, ".sdp") != NULL);
+}
+
+static void stream_add_png(struct stream *st) {
+	stream_add(st, gst_element_factory_make("imagefreeze", NULL));
+	stream_add(st, gst_element_factory_make("videoconvert", NULL));
+	stream_add(st, gst_element_factory_make("pngdec", NULL));
+}
+
 static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
 	stream_add_text(st);
 	stream_add_videobox(st);
-	if (strcmp("MPEG2", st->encoding) == 0) {
+	if (stream_is_sdp(st)) {
+		stream_add_png(st);
+	} else if (strcmp("MPEG2", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
 		stream_add(st, gst_element_factory_make("tsdemux", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
@@ -230,9 +255,7 @@ static void stream_add_later_elements(struct stream *st) {
 		stream_add(st, gst_element_factory_make("avdec_h264", NULL));
 		stream_add(st, gst_element_factory_make("rtph264depay", NULL));
 	} else if (strcmp("PNG", st->encoding) == 0) {
-		stream_add(st, gst_element_factory_make("imagefreeze", NULL));
-		stream_add(st, gst_element_factory_make("videoconvert", NULL));
-		stream_add(st, gst_element_factory_make("pngdec", NULL));
+		stream_add_png(st);
 	} else
 		elog_err("Invalid encoding: %s\n", st->encoding);
 }
@@ -241,18 +264,6 @@ static void stream_add_udp_pipe(struct stream *st) {
 	stream_add_jitter(st);
 	stream_add_filter(st);
 	stream_add_src_udp(st);
-}
-
-static bool stream_is_udp(const struct stream *st) {
-	return strncmp("udp://", st->location, 6) == 0;
-}
-
-static bool stream_is_http(const struct stream *st) {
-	return strncmp("http://", st->location, 7) == 0;
-}
-
-static bool stream_is_rtsp(const struct stream *st) {
-	return strncmp("rtsp://", st->location, 7) == 0;
 }
 
 static void stream_start_pipeline(struct stream *st) {
@@ -451,11 +462,6 @@ guint64 stream_stats(struct stream *st) {
 		st->lost = lost;
 	}
 	return lost;
-}
-
-static bool stream_is_sdp(const struct stream *st) {
-	return stream_is_http(st)
-	    && (strstr(st->location, ".sdp") != NULL);
 }
 
 static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
