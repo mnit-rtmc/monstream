@@ -19,6 +19,7 @@
 #include <gst/video/videooverlay.h>
 #include "elog.h"
 #include "nstr.h"
+#include "config.h"
 #include "stream.h"
 
 #define ONE_SEC_US	(1000000)
@@ -386,12 +387,13 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	char name[8];
 
 	st->lock = lock;
-	snprintf(name, 8, "m%d", idx);
+	snprintf(name, sizeof(name), "m%d", idx);
 	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
 	memset(st->description, 0, sizeof(st->description));
+	st->loc_hash = 0;
 	st->latency = DEFAULT_LATENCY;
 	st->font_sz = 22;
 	st->handle = 0;
@@ -403,6 +405,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->txt = NULL;
 	st->jitter = NULL;
 	st->lost = 0;
+	st->n_stops = 0;
 	st->do_stop = NULL;
 	st->ack_started = NULL;
 }
@@ -423,6 +426,17 @@ void stream_set_aspect(struct stream *st, bool aspect) {
 	st->aspect = aspect;
 }
 
+static uint64_t fnv_hash(const char *str, uint32_t len) {
+	const void *key = str;
+	const uint8_t *p = key;
+	uint64_t h = 14695981039346656037UL;
+	int i;
+	for (i = 0; i < len; i++) {
+		h = (h * 1099511628211UL) ^ p[i];
+	}
+	return h;
+}
+
 void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency)
 {
@@ -432,6 +446,8 @@ void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 	strncpy(st->encoding, encoding, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = latency;
+	st->loc_hash = fnv_hash(loc, strlen(loc));
+	st->n_stops = 0;
 }
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
@@ -472,15 +488,19 @@ static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
 	return nstr_len(*str);
 }
 
-static nstr_t stream_get_sdp(const struct stream *st, nstr_t str) {
-	CURL *ch;
+static int64_t stream_timeout(const struct stream *st) {
+	return (st->n_stops) <= 1 ? 1L : 5L;
+}
+
+static nstr_t stream_get_sdp_http(struct stream *st, nstr_t str) {
 	CURLcode rc;
 
-	ch = curl_easy_init();
+	int64_t timeout = stream_timeout(st);
+	CURL *ch = curl_easy_init();
 	curl_easy_setopt(ch, CURLOPT_URL, st->location);
 	curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, 1L);
-	curl_easy_setopt(ch, CURLOPT_TIMEOUT, 1L);
+	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, timeout);
+	curl_easy_setopt(ch, CURLOPT_TIMEOUT, timeout);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, sdp_write);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, &str);
 	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, 0);
@@ -490,6 +510,18 @@ static nstr_t stream_get_sdp(const struct stream *st, nstr_t str) {
 		str = nstr_make(str.buf, 0, 0);
 	}
 	curl_easy_cleanup(ch);
+	return str;
+}
+
+static nstr_t stream_get_sdp(struct stream *st, nstr_t str) {
+	if (st->n_stops == 0) {
+		str = config_load_cache(st->loc_hash, str);
+	}
+	if (nstr_len(str) == 0) {
+		str = stream_get_sdp_http(st, str);
+		if (nstr_len(str) > 0)
+			config_store_cache(st->loc_hash, str);
+	}
 	return str;
 }
 
@@ -572,6 +604,7 @@ void stream_start(struct stream *st) {
 }
 
 void stream_stop(struct stream *st) {
+	st->n_stops++;
 	stream_stop_pipeline(st);
 	stream_start_blank(st);
 }

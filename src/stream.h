@@ -17,6 +17,7 @@ struct stream {
 	char		description[64];
 	char		encoding[8];
 	char		sprops[64];
+	uint64_t	loc_hash;
 	uint32_t	latency;
 	uint32_t	font_sz;
 	GstElement	*pipeline;
@@ -25,6 +26,7 @@ struct stream {
 	GstElement	*txt;
 	GstElement	*jitter;
 	guint64		lost;
+	uint32_t	n_stops;
 	void		(*do_stop)	(struct stream *st);
 	void		(*ack_started)	(struct stream *st);
 };

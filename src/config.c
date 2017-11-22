@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "elog.h"
 #include "nstr.h"
@@ -24,12 +25,26 @@
 
 #define PATH_LEN	(128)
 static const char *PATH = "/var/lib/monstream/%s";
+static const char *CACHE = "cache/%016lx";
 
 /* Lock to protect config files */
 static struct lock _lock;
 
 void config_init(void) {
+	char path[PATH_LEN];
+	int rc;
+	mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+
 	lock_init(&_lock);
+
+	if (snprintf(path, sizeof(path), PATH, "cache") < 0) {
+		elog_err("Error: %s\n", strerror(errno));
+		return;
+	}
+	rc = mkdir(path, mode);
+	if (rc < 0 && errno != EEXIST) {
+		elog_err("mkdir %s: %s\n", path, strerror(errno));
+	}
 }
 
 void config_destroy(void) {
@@ -68,7 +83,20 @@ err:
 	return str;
 }
 
-ssize_t config_store(const char *name, nstr_t cmd) {
+nstr_t config_load_cache(uint64_t hash, nstr_t str) {
+	char path[PATH_LEN];
+
+	if (snprintf(path, sizeof(path), CACHE, hash) < 0) {
+		elog_err("Error: %s\n", strerror(errno));
+		goto err;
+	}
+	return config_load(path, str);
+err:
+	str.len = 0;
+	return str;
+}
+
+ssize_t config_store(const char *name, nstr_t str) {
 	char path[PATH_LEN];
 	int fd;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -80,7 +108,7 @@ ssize_t config_store(const char *name, nstr_t cmd) {
 	}
 	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if (fd >= 0) {
-		ssize_t n_bytes = write(fd, cmd.buf, cmd.len);
+		ssize_t n_bytes = write(fd, str.buf, str.len);
 		if (n_bytes < 0) {
 			elog_err("Write %s: %s\n", path,strerror(errno));
 			goto err;
@@ -94,5 +122,17 @@ ssize_t config_store(const char *name, nstr_t cmd) {
 	}
 err:
 	lock_release(&_lock, __func__);
+	return -1;
+}
+
+ssize_t config_store_cache(uint64_t hash, nstr_t str) {
+	char path[PATH_LEN];
+
+	if (snprintf(path, sizeof(path), CACHE, hash) < 0) {
+		elog_err("Error: %s\n", strerror(errno));
+		goto err;
+	}
+	return config_store(path, str);
+err:
 	return -1;
 }

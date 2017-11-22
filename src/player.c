@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include "elog.h"
 #include "nstr.h"
+#include "config.h"
 #include "lock.h"
 
 /* Host name of peer from which commands are accepted */
@@ -48,11 +49,6 @@ nstr_t mongrid_status(nstr_t str);
 
 #define DEFAULT_LATENCY	(50)
 #define DEFAULT_FONT_SZ (32)
-
-void config_init(void);
-void config_destroy(void);
-nstr_t config_load(const char *name, nstr_t str);
-ssize_t config_store(const char *name, nstr_t cmd);
 
 static int open_bind(const char *service) {
 	struct addrinfo hints;
