@@ -63,7 +63,7 @@ static int open_bind(const char *service) {
 	rc = getaddrinfo(NULL, service, &hints, &rai);
 	if (rc) {
 		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
-		return -1;
+		goto fail;
 	}
 	for (ai = rai; ai; ai = ai->ai_next) {
 		int fd = socket(ai->ai_family, ai->ai_socktype,
@@ -80,8 +80,9 @@ static int open_bind(const char *service) {
 			elog_err("socket: %s\n", strerror(errno));
 		}
 	}
-	elog_err("Could not bind to port: %s\n", service);
 	freeaddrinfo(rai);
+fail:
+	elog_err("Could not bind to port: %s\n", service);
 	return -1;
 }
 
@@ -98,7 +99,7 @@ static void connect_peer(int fd, const char *peer) {
 	rc = getaddrinfo(peer, NULL, &hints, &rai);
 	if (rc) {
 		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
-		return;
+		goto fail;
 	}
 	for (ai = rai; ai; ai = ai->ai_next) {
 		if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
@@ -108,9 +109,9 @@ static void connect_peer(int fd, const char *peer) {
 			elog_err("connect: %s\n", strerror(errno));
 		}
 	}
-	elog_err("Could not connect to peer: %s\n", peer);
 	freeaddrinfo(rai);
-	return;
+fail:
+	elog_err("Could not connect to peer: %s\n", peer);
 }
 
 static uint32_t parse_latency(nstr_t lat) {
@@ -284,20 +285,27 @@ static void read_commands(int fd) {
 	}
 }
 
-static void *command_thread(void *data) {
+static int open_bind_retry(const char *service) {
 	int fd;
+	while (true) {
+		fd = open_bind("7001");
+		if (fd >= 0)
+			break;
+		sleep(1);
+	};
+	return fd;
+}
 
-	fd = open_bind("7001");
-	if (fd > 0) {
-	 	lock_acquire(&peer_h.lock, __func__);
-		peer_h.fd = fd;
-		lock_release(&peer_h.lock, __func__);
-		connect_peer(fd, PEER);
-		while (true) {
-			read_commands(fd);
-		}
-		close(fd);
+static void *command_thread(void *data) {
+	int fd = open_bind_retry("7001");
+ 	lock_acquire(&peer_h.lock, __func__);
+	peer_h.fd = fd;
+	lock_release(&peer_h.lock, __func__);
+	connect_peer(fd, PEER);
+	while (true) {
+		read_commands(fd);
 	}
+	close(fd);
 	return NULL;
 }
 
