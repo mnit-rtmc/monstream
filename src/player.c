@@ -72,10 +72,15 @@ static int open_bind(const char *service) {
 			if (bind(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
 				freeaddrinfo(rai);
 				return fd;
-			} else
+			} else {
+				elog_err("bind: %s\n", strerror(errno));
 				close(fd);
+			}
+		} else {
+			elog_err("socket: %s\n", strerror(errno));
 		}
 	}
+	elog_err("Could not bind to port: %s\n", service);
 	freeaddrinfo(rai);
 	return -1;
 }
@@ -99,6 +104,8 @@ static void connect_peer(int fd, const char *peer) {
 		if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
 			freeaddrinfo(rai);
 			return;
+		} else {
+			elog_err("connect: %s\n", strerror(errno));
 		}
 	}
 	elog_err("Could not connect to peer: %s\n", peer);
