@@ -26,6 +26,7 @@ struct stream {
 	GstElement	*txt;
 	GstElement	*jitter;
 	guint64		lost;
+	guint64		late;
 	uint32_t	n_starts;
 	void		(*do_stop)	(struct stream *st);
 	void		(*ack_started)	(struct stream *st);
@@ -39,7 +40,7 @@ void stream_set_id(struct stream *st, const char *cam_id);
 void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency);
 void stream_set_font_size(struct stream *st, uint32_t sz);
-guint64 stream_stats(struct stream *st);
+bool stream_stats(struct stream *st);
 void stream_start(struct stream *st);
 void stream_stop(struct stream *st);
 

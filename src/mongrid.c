@@ -345,9 +345,12 @@ static void hide_cursor(GtkWidget *window) {
 	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
 }
 
-static void moncell_update_stats(struct moncell *mc, guint64 lost) {
+static void moncell_update_stats(struct moncell *mc, guint64 lost,
+	guint64 late)
+{
 	char buf[16];
-	snprintf(buf, sizeof(buf), "%" G_GUINT64_FORMAT, lost);
+	snprintf(buf, sizeof(buf), "%" G_GUINT64_FORMAT ", %" G_GUINT64_FORMAT,
+		lost, late);
 	gtk_label_set_text(GTK_LABEL(mc->stat_lbl), buf);
 }
 
@@ -357,9 +360,13 @@ static gboolean do_stats(gpointer data) {
 		for (uint32_t c = 0; c < grid.cols; c++) {
 			uint32_t i = r * grid.cols + c;
 			struct moncell *mc = grid.cells + i;
-			guint64 lost = stream_stats(&mc->stream);
-			if (grid.window)
-				moncell_update_stats(mc, lost);
+			if (stream_stats(&mc->stream)) {
+				if (grid.window) {
+					guint64 lost = mc->stream.lost;
+					guint64 late = mc->stream.late;
+					moncell_update_stats(mc, lost, late);
+				}
+			}
 		}
 	}
 	lock_release(&grid.lock, __func__);

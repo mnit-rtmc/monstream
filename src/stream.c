@@ -417,6 +417,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->txt = NULL;
 	st->jitter = NULL;
 	st->lost = 0;
+	st->late = 0;
 	st->n_starts = 0;
 	st->do_stop = NULL;
 	st->ack_started = NULL;
@@ -466,30 +467,39 @@ void stream_set_font_size(struct stream *st, uint32_t sz) {
 	st->font_sz = sz;
 }
 
-static guint64 stream_lost_pkts(struct stream *st) {
+static bool stream_update_stats(struct stream *st) {
 	if (st->jitter) {
-		GstStructure *stats;
-		g_object_get(st->jitter, "stats", &stats, NULL);
-		if (stats) {
-			guint64 lost;
-			gboolean r = gst_structure_get_uint64(stats, "num-lost",
-			        &lost);
-			gst_structure_free(stats);
-			if (r)
-				return lost;
+		GstStructure *s;
+		g_object_get(st->jitter, "stats", &s, NULL);
+		if (s) {
+			guint64 lost, late;
+			gboolean r =
+			        gst_structure_get_uint64(s, "num-lost", &lost)
+			     && gst_structure_get_uint64(s, "num-late", &late);
+			gst_structure_free(s);
+			if (r) {
+				st->lost = lost;
+				st->late = late;
+				return true;
+			}
 		}
 	}
-	return 0;
+	return false;
 }
 
-guint64 stream_stats(struct stream *st) {
-	guint64 lost = stream_lost_pkts(st);
-	if (lost != st->lost) {
-		elog_err("stats %s: %" G_GUINT64_FORMAT " lost pkts\n",
-			st->cam_id, lost);
-		st->lost = lost;
+bool stream_stats(struct stream *st) {
+	guint64 lost = st->lost;
+	guint64 late = st->late;
+	bool update = stream_update_stats(st);
+	if (update) {
+		if (lost != st->lost || late != st->late) {
+			elog_err("stats %s: %" G_GUINT64_FORMAT " lost %"
+				G_GUINT64_FORMAT " late pkts\n", st->cam_id,
+				st->lost, st->late);
+			return true;
+		}
 	}
-	return lost;
+	return false;
 }
 
 static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
