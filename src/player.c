@@ -285,8 +285,9 @@ static int open_bind_retry(const char *service) {
 	return fd;
 }
 
-static void *command_thread(void *data) {
-	int fd = open_bind_retry("7001");
+static void *command_thread(void *arg) {
+	const char *port = arg;
+	int fd = open_bind_retry(port);
  	lock_acquire(&peer_h.lock, __func__);
 	peer_h.fd = fd;
 	lock_release(&peer_h.lock, __func__);
@@ -347,22 +348,22 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
-static bool create_thread(void *(func)(void *)) {
+static bool create_thread(void *(func)(void *), void *arg) {
 	pthread_t thread;
-	int rc = pthread_create(&thread, NULL, func, NULL);
+	int rc = pthread_create(&thread, NULL, func, arg);
 	if (rc)
 		elog_err("pthread_create: %d\n", strerror(rc));
 	return !rc;
 }
 
-void run_player(bool gui, bool stats) {
+void run_player(bool gui, bool stats, const char *port) {
 	mongrid_create(gui, stats);
 	config_init();
 	lock_init(&peer_h.lock);
 	peer_h.len = 0;
-	if (!create_thread(command_thread))
+	if (!create_thread(command_thread, (void *) port))
 		goto fail;
-	if (!create_thread(status_thread))
+	if (!create_thread(status_thread, NULL))
 		goto fail;
 	while (true) {
 		uint32_t mon = load_config();
