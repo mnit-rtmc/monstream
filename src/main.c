@@ -28,16 +28,23 @@ int main(int argc, char* argv[]) {
 	bool stats = false;
 
 	printf(BANNER);
-	curl_global_init(CURL_GLOBAL_ALL);
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--no-gui") == 0)
 			gui = false;
 		else if (strcmp(argv[i], "--stats") == 0)
 			stats = true;
-		else
-			printf("Invalid option: %s\n", argv[i]);
+		else {
+			fprintf(stderr, "Invalid option: %s\n", argv[i]);
+			goto help;
+		}
 	}
+	curl_global_init(CURL_GLOBAL_ALL);
 	run_player(gui, stats);
 	curl_global_cleanup();
+	return 0;
+help:
+	printf("Usage: %s [option]\n", argv[0]);
+	printf("  --no-gui  Run headless (still connect to streams)\n");
+	printf("  --stats   Display statistics on stream errors\n");
 	return 1;
 }
