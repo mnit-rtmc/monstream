@@ -491,15 +491,13 @@ bool stream_stats(struct stream *st) {
 	guint64 lost = st->lost;
 	guint64 late = st->late;
 	bool update = stream_update_stats(st);
-	if (update) {
-		if (lost != st->lost || late != st->late) {
-			elog_err("stats %s: %" G_GUINT64_FORMAT " lost %"
-				G_GUINT64_FORMAT " late pkts\n", st->cam_id,
-				st->lost, st->late);
-			return true;
-		}
-	}
-	return false;
+	if (update && (lost != st->lost || late != st->late)) {
+		elog_err("stats %s: %" G_GUINT64_FORMAT " lost, %"
+			G_GUINT64_FORMAT " late pkts\n", st->cam_id, st->lost,
+			st->late);
+		return true;
+	} else
+		return false;
 }
 
 static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
