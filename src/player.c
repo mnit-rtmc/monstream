@@ -277,7 +277,7 @@ static void read_commands(int fd) {
 static int open_bind_retry(const char *service) {
 	int fd;
 	while (true) {
-		fd = open_bind("7001");
+		fd = open_bind(service);
 		if (fd >= 0)
 			break;
 		sleep(1);
