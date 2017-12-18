@@ -175,9 +175,11 @@ static void stream_add_src_udp(struct stream *st) {
 }
 
 static const char *stream_location_http(const struct stream *st) {
-	if (strcmp("PNG", st->encoding) == 0)
+	if ((strcmp("PNG", st->encoding) == 0) ||
+	    (strcmp("MJPEG", st->encoding) == 0))
+	{
 		return st->location;
-	else {
+	} else {
 		/* Use IP address in TEST-NET-1 range to ensure the stream
 		 * will timeout quickly */
 		return "http://192.0.2.1/";
@@ -258,17 +260,19 @@ static void stream_add_later_elements(struct stream *st) {
 	stream_add_videobox(st);
 	if (stream_is_sdp(st)) {
 		stream_add_png(st);
+	} else if (strcmp("H264", st->encoding) == 0) {
+		stream_add_h264(st);
+	} else if (strcmp("MPEG4", st->encoding) == 0) {
+		stream_add_mpeg4(st);
+	} else if (strcmp("PNG", st->encoding) == 0) {
+		stream_add_png(st);
+	} else if (strcmp("MJPEG", st->encoding) == 0) {
+		stream_add(st, gst_element_factory_make("jpegdec", NULL));
 	} else if (strcmp("MPEG2", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
 		stream_add(st, gst_element_factory_make("tsdemux", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
 		stream_add_queue(st);
-	} else if (strcmp("MPEG4", st->encoding) == 0) {
-		stream_add_mpeg4(st);
-	} else if (strcmp("H264", st->encoding) == 0) {
-		stream_add_h264(st);
-	} else if (strcmp("PNG", st->encoding) == 0) {
-		stream_add_png(st);
 	} else
 		elog_err("Invalid encoding: %s\n", st->encoding);
 }
