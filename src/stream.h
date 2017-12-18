@@ -23,7 +23,6 @@ struct stream {
 	GstElement	*pipeline;
 	GstBus		*bus;
 	GstElement	*elem[MAX_ELEMS];
-	GstElement	*txt;
 	GstElement	*jitter;
 	guint64		lost;
 	guint64		late;

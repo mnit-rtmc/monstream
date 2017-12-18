@@ -105,7 +105,6 @@ static void stream_add_text(struct stream *st) {
 	g_object_set(G_OBJECT(txt), "xpad", 48, NULL);
 	g_object_set(G_OBJECT(txt), "ypad", 36, NULL);
 	stream_add(st, txt);
-	st->txt = txt;
 }
 
 static void stream_add_videobox(struct stream *st) {
@@ -312,7 +311,6 @@ static void stream_remove_all(struct stream *st) {
 			gst_bin_remove(bin, st->elem[i]);
 	}
 	memset(st->elem, 0, sizeof(st->elem));
-	st->txt = NULL;
 	st->jitter = NULL;
 }
 
@@ -418,7 +416,6 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
 	gst_bus_add_watch(st->bus, bus_cb, st);
 	memset(st->elem, 0, sizeof(st->elem));
-	st->txt = NULL;
 	st->jitter = NULL;
 	st->lost = 0;
 	st->late = 0;
