@@ -216,6 +216,10 @@ static void stream_add_src_rtsp(struct stream *st) {
 	stream_add(st, src);
 }
 
+static bool stream_has_description(const struct stream *st) {
+	return st->description[0] != '\0';
+}
+
 static bool stream_is_udp(const struct stream *st) {
 	return strncmp("udp://", st->location, 6) == 0;
 }
@@ -255,7 +259,11 @@ static void stream_add_png(struct stream *st) {
 
 static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
-	stream_add_text(st);
+	// NOTE: MJPEG and textoverlay don't play well together,
+	//       due to timestamp issues.
+	if (stream_has_description(st) && strcmp("MJPEG", st->encoding) != 0) {
+		stream_add_text(st);
+	}
 	stream_add_videobox(st);
 	if (stream_is_sdp(st)) {
 		stream_add_png(st);
