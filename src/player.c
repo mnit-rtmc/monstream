@@ -152,6 +152,9 @@ static void process_monitor(nstr_t cmd) {
 	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// accent color
 	nstr_t p5 = nstr_split(&str, UNIT_SEP); // force-aspect-ratio
 	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// font size
+	nstr_t p7 = nstr_split(&str, UNIT_SEP); // crop code
+	nstr_t p8 = nstr_split(&str, UNIT_SEP); // horizontal gap
+	nstr_t p9 = nstr_split(&str, UNIT_SEP); // vertical gap
 	assert(nstr_cmp_z(p1, "monitor"));
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
@@ -159,11 +162,20 @@ static void process_monitor(nstr_t cmd) {
 		char accent[8];
 		char fname[16];
 		int aspect;
+		uint32_t font_sz;
+		char crop[6];
+		uint32_t hgap;
+		uint32_t vgap;
 		nstr_wrap(mid, sizeof(mid), p3);
 		nstr_wrap(accent, sizeof(accent), p4);
 		aspect = nstr_parse_u32(p5);
+		font_sz = parse_font_sz(p6);
+		nstr_wrap(crop, sizeof(crop), p7);
+		hgap = nstr_parse_u32(p8);
+		vgap = nstr_parse_u32(p9);
 		elog_cmd(cmd);
-		mongrid_set_mon(mon, mid, accent, aspect, parse_font_sz(p6));
+		mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop, hgap,
+			vgap);
 		sprintf(fname, "monitor.%d", mon);
 		config_store(fname, cmd);
 	} else

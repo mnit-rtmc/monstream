@@ -108,7 +108,7 @@ static void stream_add_text(struct stream *st) {
 }
 
 static void stream_add_videobox(struct stream *st) {
-	GstElement *vbx = gst_element_factory_make("videobox", NULL);
+	GstElement *vbx = gst_element_factory_make("videobox", "vbox");
 	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "bottom", -1, NULL);
 	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
@@ -346,6 +346,102 @@ static void stream_msg_eos(struct stream *st) {
 	lock_release(st->lock, __func__);
 }
 
+static GstElement *stream_find_videobox(struct stream *st) {
+	GstBin *bin = GST_BIN(st->pipeline);
+	return gst_bin_get_by_name(bin, "vbox");
+}
+
+static gint videobox_span(gint total, uint32_t gap, int idx, int span) {
+	// Gap is hundredths of percent of total
+	int g = (gap > 0) ? (total * gap / (10000 / 2)) : 0;
+	return (idx > 0 && idx < 4 && span >= 2 && span <= 4)
+	     ? (idx * total / span) + g
+	     : -1;
+}
+
+static gint stream_videobox_top(struct stream *st, gint height) {
+	return videobox_span(height, st->vgap,
+		st->crop[2] - 'A',
+		(st->crop[3] - 'A') + 1);
+}
+
+static gint stream_videobox_bottom(struct stream *st, gint height) {
+	return videobox_span(height, st->vgap,
+		st->crop[3] - st->crop[2],
+		(st->crop[3] - 'A') + 1);
+}
+
+static gint stream_videobox_left(struct stream *st, gint width) {
+	return videobox_span(width, st->hgap,
+		st->crop[0] - 'A',
+		(st->crop[1] - 'A') + 1);
+}
+
+static gint stream_videobox_right(struct stream *st, gint width) {
+	return videobox_span(width, st->hgap,
+		st->crop[1] - st->crop[0],
+		(st->crop[1] - 'A') + 1);
+}
+
+static void stream_config_videobox(struct stream *st, gint width, gint height) {
+	GstElement *vbx = stream_find_videobox(st);
+	if (vbx) {
+		gint top = stream_videobox_top(st, height);
+		gint bottom = stream_videobox_bottom(st, height);
+		gint left = stream_videobox_left(st, width);
+		gint right = stream_videobox_right(st, width);
+		g_object_set(G_OBJECT(vbx), "top", top, NULL);
+		g_object_set(G_OBJECT(vbx), "bottom", bottom, NULL);
+		g_object_set(G_OBJECT(vbx), "left", left, NULL);
+		g_object_set(G_OBJECT(vbx), "right", right, NULL);
+		gst_object_unref(vbx);
+	}
+}
+
+static void stream_config_size_caps(struct stream *st, GstCaps *caps) {
+	for (int i = 0; i < gst_caps_get_size(caps); i++) {
+		GstStructure *s = gst_caps_get_structure(caps, i);
+		gint height = 0;
+		gint width = 0;
+		gst_structure_get_int(s, "width", &width);
+		gst_structure_get_int(s, "height", &height);
+		if (width > 0 && height > 0)
+			stream_config_videobox(st, width, height);
+	}
+	gst_caps_unref(caps);
+}
+
+static void stream_config_size_pad(struct stream *st, GstPad *pad) {
+	GstCaps *caps = gst_pad_get_current_caps(pad);
+	if (caps)
+		stream_config_size_caps(st, caps);
+	else
+		elog_err("Could not get vbox src pad current caps\n");
+	gst_object_unref(pad);
+}
+
+static void stream_config_size(struct stream *st, GstElement *vbx) {
+	GstPad *pad = gst_element_get_static_pad(vbx, "src");
+	if (pad)
+		stream_config_size_pad(st, pad);
+	else
+		elog_err("Could not find vbox src pad\n");
+	gst_object_unref(vbx);
+}
+
+static void stream_msg_playing(struct stream *st) {
+	GstElement *vbx = stream_find_videobox(st);
+	if (vbx)
+		stream_config_size(st, vbx);
+}
+
+static void stream_msg_state(struct stream *st, GstMessage *msg) {
+	GstState old, state, pending;
+	gst_message_parse_state_changed(msg, &old, &state, &pending);
+	if (GST_STATE_PLAYING == state)
+		stream_msg_playing(st);
+}
+
 static void stream_msg_error(struct stream *st, GstMessage *msg) {
 	GError *error;
 	gchar *debug;
@@ -387,6 +483,10 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	case GST_MESSAGE_EOS:
 		stream_msg_eos(st);
 		break;
+	case GST_MESSAGE_STATE_CHANGED:
+		if (GST_MESSAGE_SRC(msg) == GST_OBJECT(st->pipeline))
+			stream_msg_state(st, msg);
+		break;
 	case GST_MESSAGE_ERROR:
 		stream_msg_error(st, msg);
 		break;
@@ -410,6 +510,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 
 	st->lock = lock;
 	snprintf(name, sizeof(name), "m%d", idx);
+	memset(st->crop, 0, sizeof(st->crop));
 	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));
 	memset(st->encoding, 0, sizeof(st->encoding));
@@ -418,6 +519,8 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->loc_hash = 0;
 	st->latency = DEFAULT_LATENCY;
 	st->font_sz = 22;
+	st->hgap = 0;
+	st->vgap = 0;
 	st->handle = 0;
 	st->aspect = FALSE;
 	st->pipeline = gst_pipeline_new(name);
@@ -474,6 +577,14 @@ void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
 	st->font_sz = sz;
+}
+
+void stream_set_crop(struct stream *st, const char *crop, uint32_t hgap,
+	uint32_t vgap)
+{
+	strncpy(st->crop, crop, sizeof(st->crop));
+	st->hgap = hgap;
+	st->vgap = vgap;
 }
 
 static bool stream_update_stats(struct stream *st) {

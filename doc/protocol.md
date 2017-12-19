@@ -18,6 +18,10 @@ Commands are separated by ASCII record separator (30).
 4. Accent color (rgb hex: 000000 -> black)
 5. Force-aspect-ratio (0 or 1)
 6. Font size (pt)
+7. Four-letter crop code (ABAB -> upper-left quad).
+   Horizontal index, span, vertical index, span
+8. Horizontal gap (1 -> 0.01%)
+9. Vertical gap (20 -> 0.2%)
 
 ### Play command
 
