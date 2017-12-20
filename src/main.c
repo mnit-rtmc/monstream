@@ -17,7 +17,7 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#define VERSION "0.32"
+#define VERSION "0.33"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
 
 void run_player(bool gui, bool stats, const char *port);
@@ -37,6 +37,8 @@ int main(int argc, char* argv[]) {
 		else if (strcmp(argv[i], "--port") == 0) {
 			i++;
 			port = argv[i];
+		} else if (strcmp(argv[i], "start") == 0) {
+			fprintf(stderr, "Ignored option: start\n");
 		} else {
 			fprintf(stderr, "Invalid option: %s\n", argv[i]);
 			goto help;
