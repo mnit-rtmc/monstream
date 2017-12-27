@@ -44,6 +44,7 @@ struct moncell {
 	GtkWidget	*desc_lbl;
 	gboolean	started;
 	gboolean        failed;
+	gboolean	clear;
 };
 
 struct mongrid {
@@ -160,12 +161,37 @@ static gboolean do_update_title(gpointer data) {
 	return FALSE;
 }
 
+static gboolean draw_cb(GtkWidget *widget, cairo_t *cr, gpointer data) {
+	struct moncell *mc = data;
+	lock_acquire(&grid.lock, __func__);
+	/* moncell may have been freed while timer ran */
+	if (is_moncell_valid(mc) && mc->clear) {
+		guint width = gtk_widget_get_allocated_width(widget);
+		guint height = gtk_widget_get_allocated_height(widget);
+		cairo_rectangle(cr, 0, 0, width, height);
+		cairo_fill(cr);
+		mc->clear = FALSE;
+	}
+	lock_release(&grid.lock, __func__);
+	return TRUE;
+}
+
+static void moncell_clear(struct moncell *mc) {
+	guint width = gtk_widget_get_allocated_width(mc->video);
+	guint height = gtk_widget_get_allocated_height(mc->video);
+	mc->clear = TRUE;
+	gtk_widget_queue_draw_area(mc->video, 0, 0, width, height);
+}
+
 static gboolean do_stop_stream(gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	lock_acquire(&grid.lock, __func__);
 	/* moncell may have been freed while timer ran */
-	if (is_moncell_valid(mc))
+	if (is_moncell_valid(mc)) {
 		stream_stop(&mc->stream);
+		if (grid.window)
+			moncell_clear(mc);
+	}
 	lock_release(&grid.lock, __func__);
 	return FALSE;
 }
@@ -230,6 +256,7 @@ static void moncell_init_gtk(struct moncell *mc) {
 	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
+	g_signal_connect(G_OBJECT(mc->video), "draw", G_CALLBACK(draw_cb), mc);
 	mc->title = create_title(mc);
 	mc->mon_lbl = create_label(mc, 6);
 	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
@@ -255,6 +282,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->font_sz = 32;
 	mc->started = FALSE;
 	mc->failed = TRUE;
+	mc->clear = TRUE;
 	if (grid.window)
 		moncell_init_gtk(mc);
 }

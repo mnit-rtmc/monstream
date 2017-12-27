@@ -29,7 +29,6 @@
 #define STREAM_NUM_VIDEO	(0)
 
 static const uint32_t DEFAULT_LATENCY = 50;
-static const uint32_t GST_VIDEO_TEST_SRC_BLACK = 2;
 
 static int stream_elem_next(const struct stream *st) {
 	int i = 0;
@@ -157,12 +156,6 @@ static void stream_add_filter(struct stream *st) {
 	g_object_set(G_OBJECT(fltr), "caps", caps, NULL);
 	gst_caps_unref(caps);
 	stream_add(st, fltr);
-}
-
-static void stream_add_src_blank(struct stream *st) {
-	GstElement *src = gst_element_factory_make("videotestsrc", NULL);
-	g_object_set(G_OBJECT(src), "pattern", GST_VIDEO_TEST_SRC_BLACK, NULL);
-	stream_add(st, src);
 }
 
 static void stream_add_src_udp(struct stream *st) {
@@ -302,13 +295,6 @@ static void stream_start_pipeline(struct stream *st) {
 		elog_err("Invalid location: %s\n", st->location);
 		return;
 	}
-	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
-}
-
-static void stream_start_blank(struct stream *st) {
-	stream_add_sink(st);
-	stream_add_src_blank(st);
-
 	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
 
@@ -739,15 +725,12 @@ static void stream_start_pipe(struct stream *st) {
 }
 
 void stream_start(struct stream *st) {
-	/* Blank pipeline is probably running -- stop it first */
+	/* Make sure pipeline is not running */
 	stream_stop_pipeline(st);
 	if (st->location[0])
 		stream_start_pipe(st);
-	else
-		stream_start_blank(st);
 }
 
 void stream_stop(struct stream *st) {
 	stream_stop_pipeline(st);
-	stream_start_blank(st);
 }
