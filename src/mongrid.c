@@ -59,14 +59,14 @@ struct mongrid {
 
 static struct mongrid grid;
 
-static bool is_moncell_valid(struct moncell *mc) {
+static bool is_moncell_valid(const struct moncell *mc) {
 	int n_cells = grid.rows * grid.cols;
-	return mc >= grid.cells && mc < (grid.cells + n_cells);
+	return (mc >= grid.cells) && mc < (grid.cells + n_cells);
 }
 
 #define ACCENT_GRAY	"444444"
 
-static bool moncell_has_title(struct moncell *mc) {
+static bool moncell_has_title(const struct moncell *mc) {
 	return mc->mid[0] != '\0';
 }
 
@@ -78,7 +78,7 @@ static void moncell_set_description(struct moncell *mc, const char *desc) {
 	strncpy(mc->description, desc, sizeof(mc->description));
 }
 
-static const char *moncell_get_description(struct moncell *mc) {
+static const char *moncell_get_description(const struct moncell *mc) {
 	/* Description used for text overlay -- blank when titlebar shown */
 	return moncell_has_title(mc) ? "" : mc->description;
 }
@@ -203,7 +203,7 @@ static void moncell_ack_started(struct stream *st) {
 	g_timeout_add(0, do_update_title, mc);
 }
 
-static GtkWidget *create_title(struct moncell *mc) {
+static GtkWidget *create_title(const struct moncell *mc) {
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 	GtkStyleContext *ctx = gtk_widget_get_style_context(box);
 	gtk_style_context_add_class(ctx, "title");
@@ -213,7 +213,7 @@ static GtkWidget *create_title(struct moncell *mc) {
 	return box;
 }
 
-static GtkWidget *create_label(struct moncell *mc, int n_chars) {
+static GtkWidget *create_label(const struct moncell *mc, int n_chars) {
 	GtkWidget *lbl = gtk_label_new("");
 	GtkStyleContext *ctx = gtk_widget_get_style_context(lbl);
 	gtk_style_context_add_provider(ctx,
