@@ -51,8 +51,7 @@ struct mongrid {
 	bool		stats;
 	GtkWidget	*window;
 	GtkGrid		*grid;
-	uint32_t	rows;
-	uint32_t	cols;
+	uint32_t	n_cells;
 	struct moncell	*cells;
 	bool		running;
 };
@@ -60,8 +59,7 @@ struct mongrid {
 static struct mongrid grid;
 
 static bool is_moncell_valid(const struct moncell *mc) {
-	int n_cells = grid.rows * grid.cols;
-	return (mc >= grid.cells) && mc < (grid.cells + n_cells);
+	return (mc >= grid.cells) && mc < (grid.cells + grid.n_cells);
 }
 
 #define ACCENT_GRAY	"444444"
@@ -228,6 +226,7 @@ static GtkWidget *create_label(const struct moncell *mc, int n_chars) {
 }
 
 static void moncell_init_gtk(struct moncell *mc) {
+	mc->stream.ack_started = moncell_ack_started;
 	mc->css_provider = gtk_css_provider_new();
 	mc->box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	mc->video = gtk_drawing_area_new();
@@ -253,13 +252,11 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	memset(mc, 0, sizeof(struct moncell));
 	stream_init(&mc->stream, idx, &grid.lock);
 	mc->stream.do_stop = moncell_stop;
-	if (grid.window)
-		mc->stream.ack_started = moncell_ack_started;
 	mc->font_sz = 32;
-	if (grid.window)
-		moncell_init_gtk(mc);
 	mc->started = FALSE;
 	mc->failed = TRUE;
+	if (grid.window)
+		moncell_init_gtk(mc);
 }
 
 static void moncell_destroy(struct moncell *mc) {
@@ -307,13 +304,8 @@ static void moncell_set_mon(struct moncell *mc, const char *mid,
 }
 
 static void mongrid_set_handles(void) {
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.cells + i;
-			moncell_set_handle(mc);
-		}
-	}
+	for (uint32_t n = 0; n < grid.n_cells; n++)
+		moncell_set_handle(grid.cells + n);
 }
 
 static uint32_t get_rows(uint32_t num) {
@@ -358,16 +350,13 @@ static void moncell_update_stats(struct moncell *mc, guint64 lost,
 
 static gboolean do_stats(gpointer data) {
 	lock_acquire(&grid.lock, __func__);
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.cells + i;
-			if (stream_stats(&mc->stream)) {
-				if (grid.window) {
-					guint64 lost = mc->stream.lost;
-					guint64 late = mc->stream.late;
-					moncell_update_stats(mc, lost, late);
-				}
+	for (uint32_t n = 0; n < grid.n_cells; n++) {
+		struct moncell *mc = grid.cells + n;
+		if (stream_stats(&mc->stream)) {
+			if (grid.window) {
+				guint64 lost = mc->stream.lost;
+				guint64 late = mc->stream.late;
+				moncell_update_stats(mc, lost, late);
 			}
 		}
 	}
@@ -376,34 +365,34 @@ static gboolean do_stats(gpointer data) {
 }
 
 void mongrid_create(bool gui, bool stats) {
-	GtkWidget *window;
-
 	gst_init(NULL, NULL);
+	memset(&grid, 0, sizeof(struct mongrid));
 	lock_init(&grid.lock);
 	grid.stats = stats;
 	if (gui) {
 		gtk_init(NULL, NULL);
-		window = gtk_window_new(0);
+		GtkWidget *window = gtk_window_new(0);
 		grid.window = window;
 		gtk_window_set_title((GtkWindow *) window, "MonStream");
 		gtk_window_fullscreen((GtkWindow *) window);
 		gtk_widget_realize(window);
 		hide_cursor(window);
-	} else
-		grid.window = NULL;
+	}
 	if (stats)
 		g_timeout_add(1000, do_stats, NULL);
 }
 
-static void mongrid_init_gtk(void) {
+static void mongrid_init_gtk(uint32_t n_cells) {
+	int n_rows = get_rows(n_cells);
+	int n_cols = get_cols(n_cells);
 	grid.grid = (GtkGrid *) gtk_grid_new();
 	gtk_grid_set_column_spacing(grid.grid, 4);
 	gtk_grid_set_row_spacing(grid.grid, 4);
 	gtk_grid_set_column_homogeneous(grid.grid, TRUE);
 	gtk_grid_set_row_homogeneous(grid.grid, TRUE);
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
+	for (uint32_t r = 0; r < n_rows; r++) {
+		for (uint32_t c = 0; c < n_cols; c++) {
+			uint32_t i = r * n_cols + c;
 			struct moncell *mc = grid.cells + i;
 			gtk_grid_attach(grid.grid, mc->box, c, r, 1, 1);
 		}
@@ -417,24 +406,16 @@ static void mongrid_init_gtk(void) {
 int32_t mongrid_init(uint32_t num) {
 	lock_acquire(&grid.lock, __func__);
 	if (num > 16) {
-		grid.rows = 0;
-		grid.cols = 0;
+		grid.n_cells = 0;
 		elog_err("Grid too large: %d\n", num);
 		goto err;
 	}
-	grid.rows = get_rows(num);
-	grid.cols = get_cols(num);
-	num = grid.rows * grid.cols;
-	grid.cells = calloc(num, sizeof(struct moncell));
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.cells + i;
-			moncell_init(mc, i);
-		}
-	}
+	grid.n_cells = get_rows(num) * get_cols(num);
+	grid.cells = calloc(grid.n_cells, sizeof(struct moncell));
+	for (uint32_t n = 0; n < grid.n_cells; n++)
+		moncell_init(grid.cells + n, n);
 	if (grid.window)
-		mongrid_init_gtk();
+		mongrid_init_gtk(grid.n_cells);
 	grid.running = false;
 	lock_release(&grid.lock, __func__);
 	return 0;
@@ -470,19 +451,13 @@ void mongrid_restart(void) {
 	}
 }
 
-void mongrid_clear(void) {
+void mongrid_reset(void) {
 	lock_acquire(&grid.lock, __func__);
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.cells + i;
-			moncell_destroy(mc);
-		}
-	}
+	for (uint32_t n = 0; n < grid.n_cells; n++)
+		moncell_destroy(grid.cells + n);
 	free(grid.cells);
 	grid.cells = NULL;
-	grid.rows = 0;
-	grid.cols = 0;
+	grid.n_cells = 0;
 	if (grid.window) {
 		gtk_container_remove(GTK_CONTAINER(grid.window),
 			(GtkWidget *) grid.grid);
@@ -495,7 +470,7 @@ void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
 	uint32_t vgap)
 {
 	lock_acquire(&grid.lock, __func__);
-	if (idx < grid.rows * grid.cols) {
+	if (idx < grid.n_cells) {
 		struct moncell *mc = grid.cells + idx;
 		moncell_set_mon(mc, mid, accent, aspect, font_sz, crop, hgap,
 			vgap);
@@ -507,7 +482,7 @@ void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency)
 {
 	lock_acquire(&grid.lock, __func__);
-	if (idx < grid.rows * grid.cols) {
+	if (idx < grid.n_cells) {
 		struct moncell *mc = grid.cells + idx;
 		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency);
 	}
@@ -515,11 +490,11 @@ void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
 }
 
 void mongrid_destroy(void) {
-	mongrid_clear();
+	mongrid_reset();
 	if (grid.window)
 		gtk_widget_destroy(grid.window);
-	grid.window = NULL;
 	lock_destroy(&grid.lock);
+	memset(&grid, 0, sizeof(struct mongrid));
 }
 
 /* ASCII separators */
@@ -542,13 +517,8 @@ static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
 
 nstr_t mongrid_status(nstr_t str) {
 	lock_acquire(&grid.lock, __func__);
-	for (uint32_t r = 0; r < grid.rows; r++) {
-		for (uint32_t c = 0; c < grid.cols; c++) {
-			uint32_t i = r * grid.cols + c;
-			struct moncell *mc = grid.cells + i;
-			str = moncell_status(mc, str, i);
-		}
-	}
+	for (uint32_t n = 0; n < grid.n_cells; n++)
+		str = moncell_status(grid.cells + n, str, n);
 	lock_release(&grid.lock, __func__);
 	return str;
 }

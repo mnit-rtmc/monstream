@@ -383,7 +383,7 @@ void run_player(bool gui, bool stats, const char *port) {
 			break;
 		load_commands(mon);
 		mongrid_run();
-		mongrid_clear();
+		mongrid_reset();
 	}
 fail:
 	lock_destroy(&peer_h.lock);
