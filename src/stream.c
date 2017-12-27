@@ -438,8 +438,11 @@ static void stream_msg_playing(struct stream *st) {
 static void stream_msg_state(struct stream *st, GstMessage *msg) {
 	GstState old, state, pending;
 	gst_message_parse_state_changed(msg, &old, &state, &pending);
-	if (GST_STATE_PLAYING == state)
+	if (GST_STATE_PLAYING == state) {
+		lock_acquire(st->lock, __func__);
 		stream_msg_playing(st);
+		lock_release(st->lock, __func__);
+	}
 }
 
 static void stream_msg_error(struct stream *st, GstMessage *msg) {
