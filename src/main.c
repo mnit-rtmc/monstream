@@ -17,7 +17,7 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#define VERSION "0.34"
+#define VERSION "0.35"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
 
 void run_player(bool gui, bool stats, const char *port);
@@ -37,7 +37,9 @@ int main(int argc, char* argv[]) {
 		else if (strcmp(argv[i], "--port") == 0) {
 			i++;
 			port = argv[i];
-		} else if (strcmp(argv[i], "start") == 0) {
+		} else if (strcmp(argv[i], "--version") == 0)
+			goto out;
+		else if (strcmp(argv[i], "start") == 0) {
 			fprintf(stderr, "Ignored option: start\n");
 		} else {
 			fprintf(stderr, "Invalid option: %s\n", argv[i]);
@@ -47,9 +49,11 @@ int main(int argc, char* argv[]) {
 	curl_global_init(CURL_GLOBAL_ALL);
 	run_player(gui, stats, port);
 	curl_global_cleanup();
+out:
 	return 0;
 help:
 	printf("Usage: %s [option]\n", argv[0]);
+	printf("  --version   Display version and exit\n");
 	printf("  --no-gui    Run headless (still connect to streams)\n");
 	printf("  --stats     Display statistics on stream errors\n");
 	printf("  --port [p]  Listen on given UDP port (default 7001)\n");
