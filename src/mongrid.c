@@ -138,17 +138,19 @@ static void moncell_update_title(struct moncell *mc) {
 		gtk_widget_hide(mc->title);
 }
 
-static void moncell_restart_stream(struct moncell *mc) {
-	if (!mc->started) {
-		stream_start(&mc->stream);
-		mc->started = TRUE;
-	}
-}
-
 static void moncell_update_accent_title(struct moncell *mc) {
 	mc->failed = !mc->started;
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
+}
+
+static void moncell_restart_stream(struct moncell *mc) {
+	if (!mc->started) {
+		bool s = stream_start(&mc->stream);
+		mc->started = TRUE;
+		if (!s)
+			moncell_update_accent_title(mc);
+	}
 }
 
 static gboolean do_update_title(gpointer data) {

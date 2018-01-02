@@ -45,7 +45,7 @@ void stream_set_crop(struct stream *st, const char *crop, uint32_t hgap,
 void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
 	const char *desc, const char *encoding, uint32_t latency);
 bool stream_stats(struct stream *st);
-void stream_start(struct stream *st);
+bool stream_start(struct stream *st);
 void stream_stop(struct stream *st);
 
 #endif

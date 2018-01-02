@@ -724,11 +724,14 @@ static void stream_start_pipe(struct stream *st) {
 	stream_start_pipeline(st);
 }
 
-void stream_start(struct stream *st) {
+bool stream_start(struct stream *st) {
 	/* Make sure pipeline is not running */
 	stream_stop_pipeline(st);
-	if (st->location[0])
+	if (st->location[0]) {
 		stream_start_pipe(st);
+		return true;
+	} else
+		return false;
 }
 
 void stream_stop(struct stream *st) {
