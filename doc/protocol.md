@@ -1,16 +1,16 @@
 # MonStream Protocol
 
-## UDP command
-
 Fields are separated by ASCII unit separator (31).
-Commands are separated by ASCII record separator (30).
+Messages are separated by ASCII record separator (30).
 
-### Config command
+## Messages from IRIS to VDU
+
+### Config
 
 1. config
 2. Monitor count (1-16)
 
-### Monitor command
+### Monitor
 
 1. monitor
 2. Monitor index (0 to 15)
@@ -23,7 +23,7 @@ Commands are separated by ASCII record separator (30).
 8. Horizontal gap (1 -> 0.01%)
 9. Vertical gap (20 -> 0.2%)
 
-### Play command
+### Play
 
 1. play
 2. Monitor index (0 to 15)
@@ -33,7 +33,18 @@ Commands are separated by ASCII record separator (30).
 6. Title: ASCII text description
 7. Latency (0-2000 ms)
 
-## Asynchronous UDP status
+### Display
+
+Sent in response to query message.
+
+1. display
+2. Monitor ID
+3. Camera ID
+4. Sequence #
+
+## Messages from VDU to IRIS
+
+### Status
 
 Sent once per second for each monitor.  Destination port is taken from last
 received command.
@@ -42,3 +53,58 @@ received command.
 2. Monitor index (0 to 15)
 3. Camera ID
 4. Stream status error (blank for OK)
+
+### Query
+
+Sent every 300 ms when USB joystick connected.
+
+1. query
+2. Monitor ID
+
+### Switch
+
+1. switch
+2. Monitor ID
+3. Camera ID
+
+### Next camera
+
+1. next
+2. Monitor ID
+
+### Previous camera
+
+1. previous
+2. Monitor ID
+
+### Sequence
+
+1. sequence
+2. Monitor ID
+3. Sequence #
+
+### Pan/tilt/zoom
+
+For held values, must be sent every second or will timeout.
+
+1. ptz
+2. Monitor ID
+3. Camera ID
+4. Pan value (-1.0 to 1.0)
+5. Tilt value (-1 to 1)
+6. Zoom value (-1 to 1)
+
+### Lens
+
+1. lens
+2. Monitor ID
+3. Camera ID
+4. iris_open / iris_close / focus_near / focus_far / wiper
+
+### Preset
+
+1. preset
+2. Monitor ID
+3. Camera ID
+4. recall / store
+5. Preset #
