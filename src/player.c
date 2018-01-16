@@ -13,24 +13,18 @@
  */
 
 #include <assert.h>
-#include <errno.h>
-#include <netdb.h>		/* for socket stuff */
 #define _MULTI_THREADED
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>		/* for memset */
-#include <unistd.h>
+#include <string.h>		/* strerror */
+#include <unistd.h>		/* sleep */
 #include "elog.h"
 #include "nstr.h"
-#include "lock.h"
 #include "config.h"
 #include "mongrid.h"
-
-/* Host name of peer from which commands are accepted */
-const char *PEER = "tms-iris.dot.state.mn.us";
+#include "peer.h"
 
 /* ASCII separators */
 static const char RECORD_SEP = '\x1E';
@@ -38,70 +32,6 @@ static const char UNIT_SEP = '\x1F';
 
 #define DEFAULT_LATENCY	(50)
 #define DEFAULT_FONT_SZ (32)
-
-static int open_bind(const char *service) {
-	struct addrinfo hints;
-	struct addrinfo *ai;
-	struct addrinfo *rai = NULL;
-	int rc;
-
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE;
-	rc = getaddrinfo(NULL, service, &hints, &rai);
-	if (rc) {
-		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
-		goto fail;
-	}
-	for (ai = rai; ai; ai = ai->ai_next) {
-		int fd = socket(ai->ai_family, ai->ai_socktype,
-			ai->ai_protocol);
-		if (fd >= 0) {
-			if (bind(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
-				freeaddrinfo(rai);
-				return fd;
-			} else {
-				elog_err("bind: %s\n", strerror(errno));
-				close(fd);
-			}
-		} else {
-			elog_err("socket: %s\n", strerror(errno));
-		}
-	}
-	freeaddrinfo(rai);
-fail:
-	elog_err("Could not bind to port: %s\n", service);
-	return -1;
-}
-
-static void connect_peer(int fd, const char *peer) {
-	struct addrinfo hints;
-	struct addrinfo *ai;
-	struct addrinfo *rai = NULL;
-	int rc;
-
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE;
-	rc = getaddrinfo(peer, NULL, &hints, &rai);
-	if (rc) {
-		elog_err("getaddrinfo: %s\n", gai_strerror(rc));
-		goto fail;
-	}
-	for (ai = rai; ai; ai = ai->ai_next) {
-		if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
-			freeaddrinfo(rai);
-			return;
-		} else {
-			elog_err("connect: %s\n", strerror(errno));
-		}
-	}
-	freeaddrinfo(rai);
-fail:
-	elog_err("Could not connect to peer: %s\n", peer);
-}
 
 static uint32_t parse_latency(nstr_t lat) {
 	int l = nstr_parse_u32(lat);
@@ -223,120 +153,28 @@ static void load_commands(uint32_t mon) {
 	}
 }
 
-struct peer {
-	struct lock             lock;
-	int			fd;
-	struct sockaddr_storage addr;
-	socklen_t               len;
-};
+static void read_commands(void) {
+	char buf[1024];
 
-/* Peer host socket address */
-static struct peer peer_h;
-
-static bool has_peer(void) {
-	bool has_peer;
-
- 	lock_acquire(&peer_h.lock, __func__);
-	has_peer = peer_h.len;
-	lock_release(&peer_h.lock, __func__);
-
-	return has_peer;
-}
-
-static void log_peer(void) {
-	if (has_peer()) {
-		struct sockaddr_storage addr;
-		socklen_t len;
-		char host[NI_MAXHOST];
-		char service[NI_MAXSERV];
-		int s;
-
-	 	lock_acquire(&peer_h.lock, __func__);
-		addr = peer_h.addr;
-		len = peer_h.len;
-		lock_release(&peer_h.lock, __func__);
-
-		s = getnameinfo((struct sockaddr *) &addr, len, host,
-			NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
-		if (0 == s)
-			elog_err("Peer %s:%s\n", host, service);
-		else
-			elog_err("getnameinfo: %s\n", gai_strerror(s));
-	} else
-		elog_err("No peer address\n");
-}
-
-static void read_commands(int fd) {
-	char                    buf[1024];
-	struct sockaddr_storage addr;
-	socklen_t               len;
-
-	len = sizeof(struct sockaddr_storage);
-	ssize_t n = recvfrom(fd, buf, sizeof(buf), 0,
-		(struct sockaddr *) &addr, &len);
- 	lock_acquire(&peer_h.lock, __func__);
-	peer_h.addr = addr;
-	peer_h.len = len;
-	lock_release(&peer_h.lock, __func__);
-	if (n >= 0)
-		process_commands(nstr_make(buf, sizeof(buf), n));
-	else {
-		elog_err("Read socket: %s\n", strerror(errno));
-		log_peer();
-	}
-}
-
-static int open_bind_retry(const char *service) {
-	int fd;
-	while (true) {
-		fd = open_bind(service);
-		if (fd >= 0)
-			break;
-		sleep(1);
-	};
-	return fd;
+	process_commands(peer_recv(nstr_make(buf, sizeof(buf), 0)));
 }
 
 static void *command_thread(void *arg) {
 	const char *port = arg;
-	int fd = open_bind_retry(port);
- 	lock_acquire(&peer_h.lock, __func__);
-	peer_h.fd = fd;
-	lock_release(&peer_h.lock, __func__);
-	connect_peer(fd, PEER);
+	peer_bind(port);
 	while (true) {
-		read_commands(fd);
+		read_commands();
 	}
-	close(fd);
 	return NULL;
-}
-
-static void send_status(nstr_t str) {
-	struct sockaddr_storage addr;
-	socklen_t               len;
-	int			fd;
-
- 	lock_acquire(&peer_h.lock, __func__);
-	addr = peer_h.addr;
-	len = peer_h.len;
-	fd = peer_h.fd;
-	lock_release(&peer_h.lock, __func__);
-
-	ssize_t n = sendto(fd, str.buf, str.len, 0,
-		(struct sockaddr *) &addr, len);
-	if (n < 0) {
-		elog_err("Send socket: %s\n", strerror(errno));
-		log_peer();
-	}
 }
 
 static void *status_thread(void *data) {
 	char buf[256];
 	while (true) {
-		if (has_peer()) {
+		if (peer_exists()) {
 			nstr_t str = nstr_make(buf, sizeof(buf), 0);
 			str = mongrid_status(str);
-			send_status(str);
+			peer_send(str);
 		}
 		sleep(1);
 	}
@@ -371,8 +209,7 @@ static bool create_thread(void *(func)(void *), void *arg) {
 void run_player(bool gui, bool stats, const char *port) {
 	mongrid_create(gui, stats);
 	config_init();
-	lock_init(&peer_h.lock);
-	peer_h.len = 0;
+	peer_init();
 	if (!create_thread(command_thread, (void *) port))
 		goto fail;
 	if (!create_thread(status_thread, NULL))
@@ -386,7 +223,7 @@ void run_player(bool gui, bool stats, const char *port) {
 		mongrid_reset();
 	}
 fail:
-	lock_destroy(&peer_h.lock);
+	peer_destroy();
 	config_destroy();
 	mongrid_destroy();
 }
