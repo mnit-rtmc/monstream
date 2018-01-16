@@ -8,7 +8,7 @@ all:  $(TARGET)
 
 SRC = src
 BUILD = build
-MODULES = player mongrid stream config nstr elog lock
+MODULES = player mongrid modebar stream config nstr elog lock
 OBJS = $(addprefix $(BUILD)/, $(addsuffix .o,$(MODULES)))
 
 $(BUILD):

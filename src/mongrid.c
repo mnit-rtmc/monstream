@@ -22,6 +22,7 @@
 #include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
+#include "modebar.h"
 #include "elog.h"
 #include "nstr.h"
 #include "stream.h"
@@ -55,7 +56,8 @@ struct mongrid {
 	struct lock	lock;
 	bool		stats;
 	GtkWidget	*window;
-	GtkGrid		*grid;
+	GtkWidget	*tbox;
+	struct modebar	*mbar;
 	uint32_t	n_cells;
 	struct moncell	*cells;
 	bool		running;
@@ -402,6 +404,8 @@ void mongrid_create(bool gui, bool stats) {
 		gtk_init(NULL, NULL);
 		GtkWidget *window = gtk_window_new(0);
 		grid.window = window;
+		// FIXME: only if joystick is plugged in
+		grid.mbar = modebar_create(grid.window);
 		gtk_window_set_title((GtkWindow *) window, "MonStream");
 		gtk_window_fullscreen((GtkWindow *) window);
 		gtk_widget_realize(window);
@@ -414,19 +418,26 @@ void mongrid_create(bool gui, bool stats) {
 static void mongrid_init_gtk(uint32_t n_cells) {
 	int n_rows = get_rows(n_cells);
 	int n_cols = get_cols(n_cells);
-	grid.grid = (GtkGrid *) gtk_grid_new();
-	gtk_grid_set_column_spacing(grid.grid, 4);
-	gtk_grid_set_row_spacing(grid.grid, 4);
-	gtk_grid_set_column_homogeneous(grid.grid, TRUE);
-	gtk_grid_set_row_homogeneous(grid.grid, TRUE);
+	grid.tbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	GtkGrid *gr = (GtkGrid *) gtk_grid_new();
+	gtk_grid_set_column_spacing(gr, 4);
+	gtk_grid_set_row_spacing(gr, 4);
+	gtk_grid_set_column_homogeneous(gr, TRUE);
+	gtk_grid_set_row_homogeneous(gr, TRUE);
 	for (uint32_t r = 0; r < n_rows; r++) {
 		for (uint32_t c = 0; c < n_cols; c++) {
 			uint32_t i = r * n_cols + c;
 			struct moncell *mc = grid.cells + i;
-			gtk_grid_attach(grid.grid, mc->box, c, r, 1, 1);
+			gtk_grid_attach(gr, mc->box, c, r, 1, 1);
 		}
 	}
-	gtk_container_add(GTK_CONTAINER(grid.window), (GtkWidget *) grid.grid);
+	g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
+	if (grid.mbar) {
+		gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
+			grid.mbar), FALSE, FALSE, 0);
+	}
+	gtk_box_pack_end(GTK_BOX(grid.tbox), GTK_WIDGET(gr), TRUE, TRUE, 0);
+	gtk_container_add(GTK_CONTAINER(grid.window), grid.tbox);
 	gtk_widget_show_all(grid.window);
 	gtk_widget_realize(grid.window);
 	mongrid_set_handles();
@@ -489,7 +500,7 @@ void mongrid_reset(void) {
 	grid.n_cells = 0;
 	if (grid.window) {
 		gtk_container_remove(GTK_CONTAINER(grid.window),
-			(GtkWidget *) grid.grid);
+			(GtkWidget *) grid.tbox);
 	}
 	lock_release(&grid.lock, __func__);
 }
@@ -503,6 +514,8 @@ void mongrid_set_mon(uint32_t idx, const char *mid, int32_t accent,
 		struct moncell *mc = grid.cells + idx;
 		moncell_set_mon(mc, mid, accent, aspect, font_sz, crop, hgap,
 			vgap);
+		if (grid.mbar && (0 == idx))
+			modebar_set_accent(grid.mbar, accent, font_sz);
 	}
 	lock_release(&grid.lock, __func__);
 }
