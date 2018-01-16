@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2018  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,12 +27,16 @@
 #include "stream.h"
 #include "lock.h"
 
+#define ACCENT_GRAY	0x444444
+#define ACCENT_LT_GRAY	0x888888
+#define COLOR_MON	0xFFFF88
+
 struct moncell {
 	struct stream	stream;          /* must be first, due to casting */
 	char		mid[8];          /* monitor ID */
-	char		accent[8];       /* accent color for title */
 	char		cam_id[20];      /* camera ID */
 	char		description[64]; /* location description */
+	int32_t		accent;          /* accent color for title */
 	uint32_t	font_sz;
 	GtkCssProvider	*css_provider;
 	GtkWidget	*box;
@@ -63,8 +67,6 @@ static bool is_moncell_valid(const struct moncell *mc) {
 	return (mc >= grid.cells) && mc < (grid.cells + grid.n_cells);
 }
 
-#define ACCENT_GRAY	"444444"
-
 static bool moncell_has_title(const struct moncell *mc) {
 	return mc->mid[0] != '\0';
 }
@@ -82,15 +84,15 @@ static const char *moncell_get_description(const struct moncell *mc) {
 	return moncell_has_title(mc) ? "" : mc->description;
 }
 
-static const char CSS_FORMAT[] =
+static const char MONCELL_CSS[] =
 	"* { "
-		"color: #FFFFFF; "
+		"color: white; "
 		"font-family: Overpass; "
 		"font-size: %upt; "
 	"}\n"
 	"box.title { "
 		"margin-top: 1px; "
-		"background-color: #%s; "
+		"background-color: #%06x; "
 	"}\n"
 	"label {"
 		"padding-left: 8px; "
@@ -98,30 +100,28 @@ static const char CSS_FORMAT[] =
 		"border-right: solid 1px white; "
 	"}\n"
 	"label#mon_lbl {"
-		"color: #FFFF88; "
-		"background-color: #%s; "
+		"color: #%06x; "
+		"background-color: #%06x; "
 		"font-weight: Bold; "
 		"border-left: solid 1px white; "
+	"}\n"
+	"label#stat_lbl {"
+		"color: #882222; "
+		"background-color: #%06x; "
 	"}\n"
 	"label#cam_lbl {"
 		"font-weight: Bold; "
 	"}\n";
 
-static const char CSS_STATS[] =
-	"label#stat_lbl {"
-		"color: #882222; "
-		"background-color: #808080; "
-	"}\n";
-
 static void moncell_set_accent(struct moncell *mc) {
-	char css[sizeof(CSS_FORMAT) + sizeof(CSS_STATS) + 16];
+	char css[sizeof(MONCELL_CSS) + 16];
 	GError *err = NULL;
-	const char *a0 = (strlen(mc->accent) > 0) ? mc->accent : ACCENT_GRAY;
-	const char *a1 = (mc->started) ? a0 : ACCENT_GRAY;
+	int32_t a0 = (mc->accent > 0) ? mc->accent : ACCENT_GRAY;
+	int32_t a1 = (mc->started) ? a0 : ACCENT_GRAY;
+	int32_t a2 = (grid.stats) ? ACCENT_LT_GRAY : a1;
 
-	snprintf(css, sizeof(css), CSS_FORMAT, mc->font_sz, a1, a0);
-	if (grid.stats)
-		strncat(css, CSS_STATS, sizeof(css));
+	snprintf(css, sizeof(css), MONCELL_CSS, mc->font_sz, a1, COLOR_MON, a0,
+		a2);
 	gtk_css_provider_load_from_data(mc->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
@@ -239,12 +239,14 @@ static GtkWidget *create_title(const struct moncell *mc) {
 	return box;
 }
 
-static GtkWidget *create_label(const struct moncell *mc, int n_chars) {
+static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
+	int n_chars)
+{
 	GtkWidget *lbl = gtk_label_new("");
 	GtkStyleContext *ctx = gtk_widget_get_style_context(lbl);
-	gtk_style_context_add_provider(ctx,
-		GTK_STYLE_PROVIDER (mc->css_provider),
+	gtk_style_context_add_provider(ctx, GTK_STYLE_PROVIDER (css_provider),
 		GTK_STYLE_PROVIDER_PRIORITY_USER);
+	gtk_widget_set_name(lbl, name);
 	gtk_label_set_selectable(GTK_LABEL(lbl), FALSE);
 	if (n_chars)
 		gtk_label_set_max_width_chars(GTK_LABEL(lbl), n_chars);
@@ -260,13 +262,10 @@ static void moncell_init_gtk(struct moncell *mc) {
 	mc->video = gtk_drawing_area_new();
 	g_signal_connect(G_OBJECT(mc->video), "draw", G_CALLBACK(draw_cb), mc);
 	mc->title = create_title(mc);
-	mc->mon_lbl = create_label(mc, 6);
-	gtk_widget_set_name(mc->mon_lbl, "mon_lbl");
-	mc->stat_lbl = create_label(mc, 0);
-	gtk_widget_set_name(mc->stat_lbl, "stat_lbl");
-	mc->cam_lbl = create_label(mc, 0);
-	gtk_widget_set_name(mc->cam_lbl, "cam_lbl");
-	mc->desc_lbl = create_label(mc, 0);
+	mc->mon_lbl = create_label(mc->css_provider, "mon_lbl", 6);
+	mc->stat_lbl = create_label(mc->css_provider, "stat_lbl", 0);
+	mc->cam_lbl = create_label(mc->css_provider, "cam_lbl", 0);
+	mc->desc_lbl = create_label(mc->css_provider, "desc_lbl", 0);
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
@@ -320,11 +319,11 @@ static void moncell_play_stream(struct moncell *mc, const char *cam_id,
 }
 
 static void moncell_set_mon(struct moncell *mc, const char *mid,
-	const char *accent, bool aspect, uint32_t font_sz, const char *crop,
+	int32_t accent, bool aspect, uint32_t font_sz, const char *crop,
 	uint32_t hgap, uint32_t vgap)
 {
 	strncpy(mc->mid, mid, sizeof(mc->mid));
-	strncpy(mc->accent, accent, sizeof(mc->accent));
+	mc->accent = accent;
 	stream_set_aspect(&mc->stream, aspect);
 	stream_set_font_size(&mc->stream, font_sz);
 	stream_set_crop(&mc->stream, crop, hgap, vgap);
@@ -495,7 +494,7 @@ void mongrid_reset(void) {
 	lock_release(&grid.lock, __func__);
 }
 
-void mongrid_set_mon(uint32_t idx, const char *mid, const char *accent,
+void mongrid_set_mon(uint32_t idx, const char *mid, int32_t accent,
 	bool aspect, uint32_t font_sz, const char *crop, uint32_t hgap,
 	uint32_t vgap)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2018  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -159,7 +159,7 @@ static void process_monitor(nstr_t cmd) {
 	int mon = nstr_parse_u32(p2);
 	if (mon >= 0) {
 		char mid[8];
-		char accent[8];
+		int32_t accent;
 		char fname[16];
 		int aspect;
 		uint32_t font_sz;
@@ -167,7 +167,7 @@ static void process_monitor(nstr_t cmd) {
 		uint32_t hgap;
 		uint32_t vgap;
 		nstr_wrap(mid, sizeof(mid), p3);
-		nstr_wrap(accent, sizeof(accent), p4);
+		accent = nstr_parse_hex(p4);
 		aspect = nstr_parse_u32(p5);
 		font_sz = parse_font_sz(p6);
 		nstr_wrap(crop, sizeof(crop), p7);
