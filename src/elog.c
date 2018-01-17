@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
@@ -36,8 +37,14 @@ void elog_err(const char *format, ...) {
 }
 
 void elog_cmd(nstr_t cmd) {
+	char buf[128];
+
+	for (int i = 0; i < cmd.len; i++) {
+		char c = cmd.buf[i];
+		buf[i] = isprint(c) ? c : ' ';
+	}
+	buf[cmd.len] = 0;
+
 	elog_now();
-	fprintf(stderr, "cmd: ");
-	fwrite(cmd.buf, cmd.len, 1, stderr);
-	fprintf(stderr, "\n");
+	fprintf(stderr, "cmd: %s\n", buf);
 }
