@@ -705,8 +705,8 @@ err:
 	gst_sdp_message_uninit(&msg);
 	return false;
 out:
-	strncpy(st->location, nstr_z(udp_uri), sizeof(st->location));
-	strncpy(st->sprops, nstr_z(sprops), sizeof(st->sprops));
+	nstr_wrap(st->location, sizeof(st->location), udp_uri);
+	nstr_wrap(st->sprops, sizeof(st->sprops), sprops);
 	elog_err("SDP redirect to %s\n", st->location);
 	gst_sdp_message_uninit(&msg);
 	return true;
