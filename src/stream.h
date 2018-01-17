@@ -38,7 +38,6 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock);
 void stream_destroy(struct stream *st);
 void stream_set_handle(struct stream *st, guintptr handle);
 void stream_set_aspect(struct stream *st, bool aspect);
-void stream_set_id(struct stream *st, const char *cam_id);
 void stream_set_font_size(struct stream *st, uint32_t sz);
 void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
 	uint32_t vgap);
