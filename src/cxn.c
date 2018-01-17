@@ -46,7 +46,7 @@ static int cxn_get_fd(struct cxn *cxn) {
 	return fd;
 }
 
-bool cxn_exists(struct cxn *cxn) {
+bool cxn_established(struct cxn *cxn) {
 	bool exists;
 
  	lock_acquire(&cxn->lock, __func__);
@@ -81,7 +81,7 @@ static void cxn_set_fd(struct cxn *cxn, int fd) {
 }
 
 static void cxn_log(struct cxn *cxn, const char *msg) {
-	if (cxn_exists(cxn)) {
+	if (cxn_established(cxn)) {
 		struct sockaddr_storage addr;
 		socklen_t len;
 		char host[NI_MAXHOST];
@@ -152,7 +152,7 @@ void cxn_send(struct cxn *cxn, nstr_t str) {
 	int                     fd;
 	ssize_t                 n;
 
-	assert(cxn_exists(cxn));
+	assert(cxn_established(cxn));
 	fd = cxn_get_fd(cxn);
 	len = cxn_get_addr(cxn, &addr);
 	n = sendto(fd, str.buf, str.len, 0, (struct sockaddr *) &addr, len);
@@ -184,7 +184,7 @@ nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 		&len);
 	if (n >= 0) {
 		str.len = n;
-		if (!cxn_exists(cxn))
+		if (!cxn_established(cxn))
 			cxn_connect(cxn, fd, &addr, len);
 	} else {
 		elog_err("Read socket: %s\n", strerror(errno));

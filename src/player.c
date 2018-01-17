@@ -173,7 +173,7 @@ static void *command_thread(void *arg) {
 static void *status_thread(void *data) {
 	char buf[256];
 	while (true) {
-		if (cxn_exists(cxn)) {
+		if (cxn_established(cxn)) {
 			nstr_t str = nstr_make(buf, sizeof(buf), 0);
 			str = mongrid_status(str);
 			cxn_send(cxn, str);
