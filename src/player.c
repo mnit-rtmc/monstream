@@ -52,14 +52,14 @@ static uint32_t parse_font_sz(nstr_t fsz) {
 static void proc_play(nstr_t cmd, bool store) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
-	nstr_t mid      = nstr_split(&str, UNIT_SEP);   // mon index
+	nstr_t mdx      = nstr_split(&str, UNIT_SEP);   // mon index
 	nstr_t cam_id   = nstr_split(&str, UNIT_SEP);   // camera ID
 	nstr_t loc      = nstr_split(&str, UNIT_SEP);   // stream URI
 	nstr_t encoding = nstr_split(&str, UNIT_SEP);   // encoding
 	nstr_t desc     = nstr_split(&str, UNIT_SEP);   // title
 	nstr_t lat      = nstr_split(&str, UNIT_SEP);   // latency
 	assert(nstr_cmp_z(play, "play"));
-	int mon = nstr_parse_u32(mid);
+	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
 		uint32_t latency = parse_latency(lat);
 		elog_cmd(cmd);
@@ -75,32 +75,23 @@ static void proc_play(nstr_t cmd, bool store) {
 
 static void proc_monitor(nstr_t cmd, bool store) {
 	nstr_t str = nstr_dup(cmd);
-	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "monitor"
-	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
-	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// monitor ID
-	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// accent color
-	nstr_t p5 = nstr_split(&str, UNIT_SEP); // force-aspect-ratio
-	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// font size
-	nstr_t p7 = nstr_split(&str, UNIT_SEP); // crop code
-	nstr_t p8 = nstr_split(&str, UNIT_SEP); // horizontal gap
-	nstr_t p9 = nstr_split(&str, UNIT_SEP); // vertical gap
-	assert(nstr_cmp_z(p1, "monitor"));
-	int mon = nstr_parse_u32(p2);
+	nstr_t monitor = nstr_split(&str, UNIT_SEP);    // "monitor"
+	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
+	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
+	nstr_t acc     = nstr_split(&str, UNIT_SEP);    // accent color
+	nstr_t asp     = nstr_split(&str, UNIT_SEP);    // force-aspect-ratio
+	nstr_t sz      = nstr_split(&str, UNIT_SEP);    // font size
+	nstr_t crop    = nstr_split(&str, UNIT_SEP);    // crop code
+	nstr_t hg      = nstr_split(&str, UNIT_SEP);    // horizontal gap
+	nstr_t vg      = nstr_split(&str, UNIT_SEP);    // vertical gap
+	assert(nstr_cmp_z(monitor, "monitor"));
+	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
-		char mid[8];
-		int32_t accent;
-		int aspect;
-		uint32_t font_sz;
-		char crop[6];
-		uint32_t hgap;
-		uint32_t vgap;
-		nstr_wrap(mid, sizeof(mid), p3);
-		accent = nstr_parse_hex(p4);
-		aspect = nstr_parse_u32(p5);
-		font_sz = parse_font_sz(p6);
-		nstr_wrap(crop, sizeof(crop), p7);
-		hgap = nstr_parse_u32(p8);
-		vgap = nstr_parse_u32(p9);
+		int32_t accent = nstr_parse_hex(acc);
+		int aspect = nstr_parse_u32(asp);
+		uint32_t font_sz = parse_font_sz(sz);
+		uint32_t hgap = nstr_parse_u32(hg);
+		uint32_t vgap = nstr_parse_u32(vg);
 		elog_cmd(cmd);
 		mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop, hgap,
 			vgap);

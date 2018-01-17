@@ -568,10 +568,10 @@ void stream_set_font_size(struct stream *st, uint32_t sz) {
 	st->font_sz = sz;
 }
 
-void stream_set_crop(struct stream *st, const char *crop, uint32_t hgap,
+void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
 	uint32_t vgap)
 {
-	strncpy(st->crop, crop, sizeof(st->crop));
+	nstr_wrap(st->crop, sizeof(st->crop), crop);
 	st->hgap = hgap;
 	st->vgap = vgap;
 }

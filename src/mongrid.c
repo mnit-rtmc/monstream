@@ -311,11 +311,11 @@ static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
 	moncell_stop_stream(mc, 20);
 }
 
-static void moncell_set_mon(struct moncell *mc, const char *mid,
-	int32_t accent, bool aspect, uint32_t font_sz, const char *crop,
-	uint32_t hgap, uint32_t vgap)
+static void moncell_set_mon(struct moncell *mc, nstr_t mid, int32_t accent,
+	bool aspect, uint32_t font_sz, nstr_t crop, uint32_t hgap,
+	uint32_t vgap)
 {
-	strncpy(mc->mid, mid, sizeof(mc->mid));
+	nstr_wrap(mc->mid, sizeof(mc->mid), mid);
 	mc->accent = accent;
 	stream_set_aspect(&mc->stream, aspect);
 	stream_set_font_size(&mc->stream, font_sz);
@@ -496,9 +496,8 @@ void mongrid_reset(void) {
 	lock_release(&grid.lock, __func__);
 }
 
-void mongrid_set_mon(uint32_t idx, const char *mid, int32_t accent,
-	bool aspect, uint32_t font_sz, const char *crop, uint32_t hgap,
-	uint32_t vgap)
+void mongrid_set_mon(uint32_t idx, nstr_t mid, int32_t accent, bool aspect,
+	uint32_t font_sz, nstr_t crop, uint32_t hgap, uint32_t vgap)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.n_cells) {
