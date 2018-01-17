@@ -551,6 +551,13 @@ nstr_t mongrid_status(nstr_t str) {
 	lock_acquire(&grid.lock, __func__);
 	for (uint32_t n = 0; n < grid.n_cells; n++)
 		str = moncell_status(grid.cells + n, str, n);
+	if (grid.mbar)
+		str = modebar_query(grid.mbar, str);
 	lock_release(&grid.lock, __func__);
 	return str;
+}
+
+void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
+	if (grid.mbar)
+		modebar_display(grid.mbar, mon, cam, seq);
 }

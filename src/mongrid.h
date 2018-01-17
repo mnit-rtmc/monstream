@@ -14,5 +14,6 @@ void mongrid_set_mon(uint32_t idx, nstr_t mid, uint32_t accent, bool aspect,
 void mongrid_play_stream(uint32_t idx, nstr_t cam_id, nstr_t loc, nstr_t desc,
 	nstr_t encoding, uint32_t latency);
 nstr_t mongrid_status(nstr_t str);
+void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq);
 
 #endif

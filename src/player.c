@@ -49,8 +49,19 @@ static uint32_t parse_font_sz(nstr_t fsz) {
 	return (s > 0) ? s : DEFAULT_FONT_SZ;
 }
 
+static void proc_display(struct player *plyr, nstr_t cmd) {
+	nstr_t str     = nstr_dup(cmd);
+	nstr_t display = nstr_split(&str, UNIT_SEP);    // "display"
+	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
+	nstr_t cam     = nstr_split(&str, UNIT_SEP);    // camera ID
+	nstr_t seq     = nstr_split(&str, UNIT_SEP);    // sequence ID
+	assert(nstr_cmp_z(display, "display"));
+	elog_cmd(cmd);
+	mongrid_display(mid, cam, seq);
+}
+
 static void proc_play(nstr_t cmd, bool store) {
-	nstr_t str = nstr_dup(cmd);
+	nstr_t str      = nstr_dup(cmd);
 	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
 	nstr_t mdx      = nstr_split(&str, UNIT_SEP);   // mon index
 	nstr_t cam_id   = nstr_split(&str, UNIT_SEP);   // camera ID
@@ -74,7 +85,7 @@ static void proc_play(nstr_t cmd, bool store) {
 }
 
 static void proc_monitor(nstr_t cmd, bool store) {
-	nstr_t str = nstr_dup(cmd);
+	nstr_t str     = nstr_dup(cmd);
 	nstr_t monitor = nstr_split(&str, UNIT_SEP);    // "monitor"
 	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
 	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
@@ -110,9 +121,11 @@ static void proc_config(nstr_t cmd) {
 	mongrid_restart();
 }
 
-static void proc_cmd(nstr_t cmd, bool store) {
+static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
-	if (nstr_cmp_z(p1, "play"))
+	if (nstr_cmp_z(p1, "display"))
+		proc_display(plyr, cmd);
+	else if (nstr_cmp_z(p1, "play"))
 		proc_play(cmd, store);
 	else if (nstr_cmp_z(p1, "monitor"))
 		proc_monitor(cmd, store);
@@ -122,50 +135,50 @@ static void proc_cmd(nstr_t cmd, bool store) {
 		elog_err("Invalid command: %s\n", nstr_z(cmd));
 }
 
-static void proc_cmds(nstr_t str, bool store) {
+static void player_proc_cmds(struct player *plyr, nstr_t str, bool store) {
 	while (nstr_len(str)) {
-		proc_cmd(nstr_split(&str, RECORD_SEP), store);
+		player_proc_cmd(plyr, nstr_split(&str, RECORD_SEP), store);
 	}
 }
 
-static void player_read_cmds(struct player *player) {
+static void player_read_cmds(struct player *plyr) {
 	char buf[1024];
 	nstr_t str = nstr_make(buf, sizeof(buf), 0);
-	proc_cmds(cxn_recv(player->cxn, str), true);
+	player_proc_cmds(plyr, cxn_recv(plyr->cxn, str), true);
 }
 
 static void *cmd_thread(void *arg) {
-	struct player *player = arg;
+	struct player *plyr = arg;
 
-	cxn_bind(player->cxn, player->port);
+	cxn_bind(plyr->cxn, plyr->port);
 	while (true) {
-		player_read_cmds(player);
+		player_read_cmds(plyr);
 	}
 	return NULL;
 }
 
-static void player_send_status(struct player *player) {
+static void player_send_status(struct player *plyr) {
 	char buf[256];
 
 	nstr_t str = nstr_make(buf, sizeof(buf), 0);
 	str = mongrid_status(str);
-	cxn_send(player->cxn, str);
+	cxn_send(plyr->cxn, str);
 }
 
 static void *status_thread(void *arg) {
-	struct player *player = arg;
+	struct player *plyr = arg;
 
 	while (true) {
-		if (cxn_established(player->cxn))
-			player_send_status(player);
+		if (cxn_established(plyr->cxn))
+			player_send_status(plyr);
 		sleep(1);
 	}
 	return NULL;
 }
 
-static bool player_create_thread(struct player *player, void *(func)(void *)) {
+static bool player_create_thread(struct player *plyr, void *(func)(void *)) {
 	pthread_t thread;
-	int rc = pthread_create(&thread, NULL, func, player);
+	int rc = pthread_create(&thread, NULL, func, plyr);
 	if (rc)
 		elog_err("pthread_create: %d\n", strerror(rc));
 	return !rc;
@@ -188,45 +201,45 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
-static void load_cmd(const char *fname) {
+static void player_load_cmd(struct player *plyr, const char *fname) {
 	char buf[128];
 	nstr_t str = nstr_make(buf, sizeof(buf), 0);
-	proc_cmds(config_load(fname, str), false);
+	player_proc_cmds(plyr, config_load(fname, str), false);
 }
 
-static void load_cmds(uint32_t mon) {
+static void player_load_cmds(struct player *plyr, uint32_t mon) {
 	int i;
 	for (i = 0; i < mon; i++) {
 		char fname[16];
 		sprintf(fname, "monitor.%d", i);
-		load_cmd(fname);
+		player_load_cmd(plyr, fname);
 		sprintf(fname, "play.%d", i);
-		load_cmd(fname);
+		player_load_cmd(plyr, fname);
 	}
 }
 
 void run_player(bool gui, bool stats, const char *port) {
-	struct player player;
+	struct player plyr;
 
-	memset(&player, 0, sizeof(struct player));
-	player.port = port;
+	memset(&plyr, 0, sizeof(struct player));
+	plyr.port = port;
 	config_init();
-	player.cxn = cxn_create();
+	plyr.cxn = cxn_create();
 	mongrid_create(gui, stats);
-	if (!player_create_thread(&player, cmd_thread))
+	if (!player_create_thread(&plyr, cmd_thread))
 		goto fail;
-	if (!player_create_thread(&player, status_thread))
+	if (!player_create_thread(&plyr, status_thread))
 		goto fail;
 	while (true) {
 		uint32_t mon = load_config();
 		if (mongrid_init(mon))
 			break;
-		load_cmds(mon);
+		player_load_cmds(&plyr, mon);
 		mongrid_run();
 		mongrid_reset();
 	}
 fail:
 	mongrid_destroy();
-	cxn_destroy(player.cxn);
+	cxn_destroy(plyr.cxn);
 	config_destroy();
 }

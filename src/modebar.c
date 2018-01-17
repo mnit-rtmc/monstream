@@ -39,8 +39,9 @@ struct modebar {
 	GtkCssProvider	*css_provider;
 	struct modecell cells[MODECELL_LAST];
 	char		entry[6];
-	char		mon[10];
-	char		cam[10];
+	char		mon[6];
+	char		cam[6];
+	char            seq[6];
 };
 
 static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
@@ -90,22 +91,25 @@ static void modebar_set_text2(struct modebar *mbar, int n_cell, const char *t) {
 }
 
 static bool modebar_has_mon(const struct modebar *mbar) {
-	return strlen(mbar->mon) > 4;
+	return strlen(mbar->mon);
 }
 
 static bool modebar_has_cam(const struct modebar *mbar) {
-	return strlen(mbar->cam) > 4;
+	return strlen(mbar->cam);
 }
 
 static void modebar_set_text(struct modebar *mbar) {
-	char entry[8];
-	snprintf(entry, sizeof(entry), "%s_", mbar->entry);
-	modebar_set_text2(mbar, MODECELL_MON, mbar->mon);
-	modebar_set_text2(mbar, MODECELL_CAM, mbar->cam);
-	modebar_set_text2(mbar, MODECELL_ENT, entry);
-	modebar_set_text2(mbar, MODECELL_SEQ, modebar_has_mon(mbar) ? "Seq":"");
-	modebar_set_text2(mbar, MODECELL_PRESET,
-		modebar_has_cam(mbar) ? "Preset" : "");
+	char buf[8];
+	bool has_cam = modebar_has_cam(mbar);
+	snprintf(buf, sizeof(buf), "Mon %s", mbar->mon);
+	modebar_set_text2(mbar, MODECELL_MON, buf);
+	snprintf(buf, sizeof(buf), "Cam %s", mbar->cam);
+	modebar_set_text2(mbar, MODECELL_CAM, has_cam ? buf : "");
+	snprintf(buf, sizeof(buf), "%s_", mbar->entry);
+	modebar_set_text2(mbar, MODECELL_ENT, buf);
+	snprintf(buf, sizeof(buf), "Seq %s", mbar->seq);
+	modebar_set_text2(mbar, MODECELL_SEQ, has_cam ? buf : "");
+	modebar_set_text2(mbar, MODECELL_PRESET, has_cam ? "Preset" : "");
 }
 
 static char get_key_char(const GdkEventKey *key) {
@@ -178,14 +182,15 @@ static char get_key_char(const GdkEventKey *key) {
 }
 
 static void modebar_set_mon(struct modebar *mbar) {
-	snprintf(mbar->mon, sizeof(mbar->mon), "Mon %s", mbar->entry);
+	// FIXME: send query to IRIS
+	strncpy(mbar->mon, mbar->entry, sizeof(mbar->mon));
 	memset(mbar->cam, 0, sizeof(mbar->cam));
+	memset(mbar->seq, 0, sizeof(mbar->seq));
 	memset(mbar->entry, 0, sizeof(mbar->entry));
 }
 
 static void modebar_set_cam(struct modebar *mbar) {
-	// FIXME: send request to IRIS instead
-	snprintf(mbar->cam, sizeof(mbar->cam), "Cam %s", mbar->entry);
+	// FIXME: send request to IRIS
 	memset(mbar->entry, 0, sizeof(mbar->entry));
 }
 
@@ -286,4 +291,26 @@ void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
 	gtk_css_provider_load_from_data(mbar->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
+}
+
+/* ASCII separators */
+static const char RECORD_SEP = '\x1E';
+static const char UNIT_SEP = '\x1F';
+
+nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
+	if (modebar_has_mon(mbar)) {
+		char buf[64];
+		snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
+			RECORD_SEP);
+		nstr_cat_z(&str, buf);
+	}
+	return str;
+}
+
+void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
+	if (nstr_cmp_z(mon, mbar->mon)) {
+		nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
+		nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
+		modebar_set_text(mbar);
+	}
 }
