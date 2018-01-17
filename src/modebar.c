@@ -240,6 +240,7 @@ struct modebar *modebar_create(GtkWidget *window) {
 	g_object_set(G_OBJECT(mbar->box), "spacing", 8, NULL);
 	g_signal_connect(G_OBJECT(window), "key_press_event",
 		G_CALLBACK(key_press), mbar);
+	modebar_set_mon(mbar);
 	modebar_set_text(mbar);
 	return mbar;
 }
