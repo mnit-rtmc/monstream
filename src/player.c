@@ -209,8 +209,8 @@ static bool create_thread(void *(func)(void *), void *arg) {
 }
 
 void run_player(bool gui, bool stats, const char *port) {
-	mongrid_create(gui, stats);
 	config_init();
+	mongrid_create(gui, stats);
 	cxn = cxn_create();
 	if (!create_thread(command_thread, (void *) port))
 		goto fail;
@@ -226,6 +226,6 @@ void run_player(bool gui, bool stats, const char *port) {
 	}
 fail:
 	cxn_destroy(cxn);
-	config_destroy();
 	mongrid_destroy();
+	config_destroy();
 }

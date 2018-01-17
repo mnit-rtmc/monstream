@@ -19,8 +19,6 @@
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 #include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gst/video/videooverlay.h>
 #include <gtk/gtk.h>
 #include "modebar.h"
 #include "elog.h"
@@ -35,7 +33,6 @@
 struct moncell {
 	struct stream	stream;          /* must be first, due to casting */
 	char		mid[8];          /* monitor ID */
-	char		cam_id[20];      /* camera ID */
 	char		description[64]; /* location description */
 	int32_t		accent;          /* accent color for title */
 	uint32_t	font_sz;
@@ -73,17 +70,12 @@ static bool moncell_has_title(const struct moncell *mc) {
 	return mc->mid[0] != '\0';
 }
 
-static void moncell_set_cam_id(struct moncell *mc, const char *cam_id) {
-	strncpy(mc->cam_id, cam_id, sizeof(mc->cam_id));
+static const char *moncell_get_cam_id(const struct moncell *mc) {
+	return mc->stream.cam_id;
 }
 
 static void moncell_set_description(struct moncell *mc, const char *desc) {
 	strncpy(mc->description, desc, sizeof(mc->description));
-}
-
-static const char *moncell_get_description(const struct moncell *mc) {
-	/* Description used for text overlay -- blank when titlebar shown */
-	return moncell_has_title(mc) ? "" : mc->description;
 }
 
 static const char MONCELL_CSS[] =
@@ -133,7 +125,8 @@ static void moncell_update_title(struct moncell *mc) {
 	/* Hide titlebar when monitor ID is blank */
 	if (moncell_has_title(mc)) {
 		gtk_label_set_text(GTK_LABEL(mc->mon_lbl), mc->mid);
-		gtk_label_set_text(GTK_LABEL(mc->cam_lbl), mc->cam_id);
+		gtk_label_set_text(GTK_LABEL(mc->cam_lbl),
+			moncell_get_cam_id(mc));
 		gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
 		gtk_widget_show_all(mc->title);
 	} else
@@ -312,10 +305,9 @@ static void moncell_play_stream(struct moncell *mc, const char *cam_id,
 	const char *loc, const char *desc, const char *encoding,
 	uint32_t latency)
 {
-	moncell_set_cam_id(mc, cam_id);
+	const char *d = moncell_has_title(mc) ? "" : desc;
 	moncell_set_description(mc, desc);
-	stream_set_params(&mc->stream, cam_id, loc, moncell_get_description(mc),
-		encoding, latency);
+	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 }
@@ -551,7 +543,7 @@ static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
 		strcpy(failed, "failed");
 	snprintf(buf, sizeof(buf), "status%c%d%c%s%c%s%c", UNIT_SEP,
 		idx, UNIT_SEP,
-		mc->cam_id, UNIT_SEP,
+		moncell_get_cam_id(mc), UNIT_SEP,
 		failed, RECORD_SEP);
 	nstr_cat_z(&str, buf);
 	return str;
