@@ -92,7 +92,7 @@ static void cxn_log(struct cxn *cxn, const char *msg) {
 		s = getnameinfo((struct sockaddr *) &addr, len, host,
 			NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
 		if (0 == s)
-			elog_err("Connection %s:%s %s\n", host, service, msg);
+			elog_err("cxn: %s:%s %s\n", host, service, msg);
 		else
 			elog_err("getnameinfo: %s\n", gai_strerror(s));
 	} else
@@ -172,6 +172,20 @@ static void cxn_connect(struct cxn *cxn, int fd, struct sockaddr_storage *addr,
 		elog_err("connect: %s\n", strerror(errno));
 }
 
+static void cxn_disconnect(struct cxn *cxn, int fd) {
+	struct sockaddr_storage addr;
+
+	memset(&addr, 0, sizeof(struct sockaddr_storage));
+	addr.ss_family = AF_UNSPEC;
+	if (connect(fd, (const struct sockaddr *) &addr,
+		sizeof(struct sockaddr_storage)) == 0)
+	{
+		cxn_log(cxn, "disconnected");
+		cxn_set_addr(cxn, &addr, 0);
+	} else
+		elog_err("disconnect: %s\n", strerror(errno));
+}
+
 nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 	int                     fd;
 	struct sockaddr_storage addr;
@@ -187,8 +201,12 @@ nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 		if (!cxn_established(cxn))
 			cxn_connect(cxn, fd, &addr, len);
 	} else {
-		elog_err("Read socket: %s\n", strerror(errno));
-		cxn_log(cxn, "recv error");
+		if (ECONNREFUSED == errno)
+			cxn_disconnect(cxn, fd);
+		else {
+			elog_err("Read socket: %s\n", strerror(errno));
+			cxn_log(cxn, "recv error");
+		}
 		str.len = 0;
 	}
 	return str;
