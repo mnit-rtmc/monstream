@@ -24,7 +24,9 @@
 #include "nstr.h"
 #include "config.h"
 #include "mongrid.h"
-#include "peer.h"
+#include "cxn.h"
+
+static struct cxn *cxn;
 
 /* ASCII separators */
 static const char RECORD_SEP = '\x1E';
@@ -156,12 +158,12 @@ static void load_commands(uint32_t mon) {
 static void read_commands(void) {
 	char buf[1024];
 
-	process_commands(peer_recv(nstr_make(buf, sizeof(buf), 0)));
+	process_commands(cxn_recv(cxn, nstr_make(buf, sizeof(buf), 0)));
 }
 
 static void *command_thread(void *arg) {
 	const char *port = arg;
-	peer_bind(port);
+	cxn_bind(cxn, port);
 	while (true) {
 		read_commands();
 	}
@@ -171,10 +173,10 @@ static void *command_thread(void *arg) {
 static void *status_thread(void *data) {
 	char buf[256];
 	while (true) {
-		if (peer_exists()) {
+		if (cxn_exists(cxn)) {
 			nstr_t str = nstr_make(buf, sizeof(buf), 0);
 			str = mongrid_status(str);
-			peer_send(str);
+			cxn_send(cxn, str);
 		}
 		sleep(1);
 	}
@@ -209,7 +211,7 @@ static bool create_thread(void *(func)(void *), void *arg) {
 void run_player(bool gui, bool stats, const char *port) {
 	mongrid_create(gui, stats);
 	config_init();
-	peer_init();
+	cxn = cxn_create();
 	if (!create_thread(command_thread, (void *) port))
 		goto fail;
 	if (!create_thread(status_thread, NULL))
@@ -223,7 +225,7 @@ void run_player(bool gui, bool stats, const char *port) {
 		mongrid_reset();
 	}
 fail:
-	peer_destroy();
+	cxn_destroy(cxn);
 	config_destroy();
 	mongrid_destroy();
 }

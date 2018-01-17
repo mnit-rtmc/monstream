@@ -20,79 +20,86 @@
 #include <string.h>
 #include <unistd.h>
 #include "elog.h"
-#include "nstr.h"
 #include "lock.h"
+#include "cxn.h"
 
-struct peer {
+/* Connection struct */
+struct cxn {
 	struct lock             lock;
 	int			fd;
 	struct sockaddr_storage addr;
 	socklen_t               len;
 };
 
-/* Peer host socket address */
-static struct peer peer_h;
+struct cxn *cxn_create(void) {
+	struct cxn *cxn = malloc(sizeof(struct cxn));
+	memset(cxn, 0, sizeof(struct cxn));
+	lock_init(&cxn->lock);
+	return cxn;
+}
 
-bool peer_exists(void) {
+static int cxn_get_fd(struct cxn *cxn) {
+	int fd;
+ 	lock_acquire(&cxn->lock, __func__);
+	fd = cxn->fd;
+	lock_release(&cxn->lock, __func__);
+	return fd;
+}
+
+bool cxn_exists(struct cxn *cxn) {
 	bool exists;
 
- 	lock_acquire(&peer_h.lock, __func__);
-	exists = peer_h.len;
-	lock_release(&peer_h.lock, __func__);
+ 	lock_acquire(&cxn->lock, __func__);
+	exists = cxn->len;
+	lock_release(&cxn->lock, __func__);
 
 	return exists;
 }
 
-static socklen_t peer_get_addr(struct sockaddr_storage *addr) {
+static socklen_t cxn_get_addr(struct cxn *cxn, struct sockaddr_storage *addr) {
 	socklen_t len;
- 	lock_acquire(&peer_h.lock, __func__);
-	*addr = peer_h.addr;
-	len = peer_h.len;
-	lock_release(&peer_h.lock, __func__);
+ 	lock_acquire(&cxn->lock, __func__);
+	*addr = cxn->addr;
+	len = cxn->len;
+	lock_release(&cxn->lock, __func__);
 	return len;
 }
 
-static void peer_set_addr(struct sockaddr_storage *addr, socklen_t len) {
- 	lock_acquire(&peer_h.lock, __func__);
-	peer_h.addr = *addr;
-	peer_h.len = len;
-	lock_release(&peer_h.lock, __func__);
+static void cxn_set_addr(struct cxn *cxn, struct sockaddr_storage *addr,
+	socklen_t len)
+{
+ 	lock_acquire(&cxn->lock, __func__);
+	cxn->addr = *addr;
+	cxn->len = len;
+	lock_release(&cxn->lock, __func__);
 }
 
-static int peer_get_fd(void) {
-	int fd;
- 	lock_acquire(&peer_h.lock, __func__);
-	fd = peer_h.fd;
-	lock_release(&peer_h.lock, __func__);
-	return fd;
+static void cxn_set_fd(struct cxn *cxn, int fd) {
+ 	lock_acquire(&cxn->lock, __func__);
+	cxn->fd = fd;
+	lock_release(&cxn->lock, __func__);
 }
 
-static void peer_set_fd(int fd) {
- 	lock_acquire(&peer_h.lock, __func__);
-	peer_h.fd = fd;
-	lock_release(&peer_h.lock, __func__);
-}
-
-static void peer_log(const char *msg) {
-	if (peer_exists()) {
+static void cxn_log(struct cxn *cxn, const char *msg) {
+	if (cxn_exists(cxn)) {
 		struct sockaddr_storage addr;
 		socklen_t len;
 		char host[NI_MAXHOST];
 		char service[NI_MAXSERV];
 		int s;
 
-		len = peer_get_addr(&addr);
+		len = cxn_get_addr(cxn, &addr);
 		s = getnameinfo((struct sockaddr *) &addr, len, host,
 			NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICSERV);
 		if (0 == s)
-			elog_err("Peer %s:%s %s\n", host, service, msg);
+			elog_err("Connection %s:%s %s\n", host, service, msg);
 		else
 			elog_err("getnameinfo: %s\n", gai_strerror(s));
 	} else
-		elog_err("No peer address; %s\n", msg);
+		elog_err("No connection address; %s\n", msg);
 }
 
-static int peer_bind_try(const char *service) {
+static int cxn_bind_try(const char *service) {
 	struct addrinfo hints;
 	struct addrinfo *ai;
 	struct addrinfo *rai = NULL;
@@ -128,71 +135,68 @@ fail:
 	return -1;
 }
 
-void peer_bind(const char *service) {
+void cxn_bind(struct cxn *cxn, const char *service) {
 	int fd;
 	while (true) {
-		fd = peer_bind_try(service);
+		fd = cxn_bind_try(service);
 		if (fd >= 0)
 			break;
 		sleep(1);
 	};
-	peer_set_fd(fd);
+	cxn_set_fd(cxn, fd);
 }
 
-void peer_send(nstr_t str) {
+void cxn_send(struct cxn *cxn, nstr_t str) {
 	struct sockaddr_storage addr;
 	socklen_t               len;
 	int                     fd;
 	ssize_t                 n;
 
-	assert(peer_exists());
-	fd = peer_get_fd();
-	len = peer_get_addr(&addr);
+	assert(cxn_exists(cxn));
+	fd = cxn_get_fd(cxn);
+	len = cxn_get_addr(cxn, &addr);
 	n = sendto(fd, str.buf, str.len, 0, (struct sockaddr *) &addr, len);
 	if (n < 0) {
 		elog_err("Send socket: %s\n", strerror(errno));
-		peer_log("send error");
+		cxn_log(cxn, "send error");
 	}
 }
 
-static void peer_connect(int fd, struct sockaddr_storage *addr, socklen_t len) {
+static void cxn_connect(struct cxn *cxn, int fd, struct sockaddr_storage *addr,
+	socklen_t len)
+{
 	if (connect(fd, (const struct sockaddr *) addr, len) == 0) {
-		peer_set_addr(addr, len);
-		peer_log("connected");
+		cxn_set_addr(cxn, addr, len);
+		cxn_log(cxn, "connected");
 	} else
 		elog_err("connect: %s\n", strerror(errno));
 }
 
-nstr_t peer_recv(nstr_t str) {
+nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 	int                     fd;
 	struct sockaddr_storage addr;
 	socklen_t               len;
 	ssize_t                 n;
 
-	fd = peer_get_fd();
+	fd = cxn_get_fd(cxn);
 	len = sizeof(struct sockaddr_storage);
 	n = recvfrom(fd, str.buf, str.buf_len, 0, (struct sockaddr *) &addr,
 		&len);
 	if (n >= 0) {
 		str.len = n;
-		if (!peer_exists())
-			peer_connect(fd, &addr, len);
+		if (!cxn_exists(cxn))
+			cxn_connect(cxn, fd, &addr, len);
 	} else {
 		elog_err("Read socket: %s\n", strerror(errno));
-		peer_log("recv error");
+		cxn_log(cxn, "recv error");
 		str.len = 0;
 	}
 	return str;
 }
 
-void peer_init(void) {
-	memset(&peer_h, 0, sizeof(struct peer));
-	lock_init(&peer_h.lock);
-}
-
-void peer_destroy(void) {
-	int fd = peer_get_fd();
+void cxn_destroy(struct cxn *cxn) {
+	int fd = cxn_get_fd(cxn);
 	if (fd && (close(fd) < 0))
 		elog_err("Close: %s\n", strerror(errno));
-	lock_destroy(&peer_h.lock);
+	lock_destroy(&cxn->lock);
 }
