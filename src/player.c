@@ -26,21 +26,30 @@
 #include "mongrid.h"
 #include "cxn.h"
 
-static struct cxn *cxn;
+struct player {
+	struct cxn *cxn;
+	const char *port;
+};
 
 /* ASCII separators */
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-#define DEFAULT_LATENCY	(50)
-#define DEFAULT_FONT_SZ (32)
+/* Default values */
+static const uint32_t DEFAULT_LATENCY = 50;
+static const uint32_t DEFAULT_FONT_SZ = 32;
 
 static uint32_t parse_latency(nstr_t lat) {
 	int l = nstr_parse_u32(lat);
 	return (l > 0) ? l : DEFAULT_LATENCY;
 }
 
-static void process_play(nstr_t cmd) {
+static uint32_t parse_font_sz(nstr_t fsz) {
+	int s = nstr_parse_u32(fsz);
+	return (s > 0) ? s : DEFAULT_FONT_SZ;
+}
+
+static void proc_play(nstr_t cmd, bool store) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "play"
 	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
@@ -56,7 +65,6 @@ static void process_play(nstr_t cmd) {
 		char desc[128];
 		char uri[128];
 		char encoding[16];
-		char fname[16];
 
 		nstr_wrap(cam_id, sizeof(cam_id), p3);
 		nstr_wrap(uri, sizeof(uri), p4);
@@ -65,18 +73,16 @@ static void process_play(nstr_t cmd) {
 		elog_cmd(cmd);
 		mongrid_play_stream(mon, cam_id, uri, desc, encoding,
 			parse_latency(p7));
-		sprintf(fname, "play.%d", mon);
-		config_store(fname, cmd);
+		if (store) {
+			char fname[16];
+			sprintf(fname, "play.%d", mon);
+			config_store(fname, cmd);
+		}
 	} else
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static uint32_t parse_font_sz(nstr_t fsz) {
-	int s = nstr_parse_u32(fsz);
-	return (s > 0) ? s : DEFAULT_FONT_SZ;
-}
-
-static void process_monitor(nstr_t cmd) {
+static void proc_monitor(nstr_t cmd, bool store) {
 	nstr_t str = nstr_dup(cmd);
 	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "monitor"
 	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
@@ -92,7 +98,6 @@ static void process_monitor(nstr_t cmd) {
 	if (mon >= 0) {
 		char mid[8];
 		int32_t accent;
-		char fname[16];
 		int aspect;
 		uint32_t font_sz;
 		char crop[6];
@@ -108,79 +113,80 @@ static void process_monitor(nstr_t cmd) {
 		elog_cmd(cmd);
 		mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop, hgap,
 			vgap);
-		sprintf(fname, "monitor.%d", mon);
-		config_store(fname, cmd);
+		if (store) {
+			char fname[16];
+			sprintf(fname, "monitor.%d", mon);
+			config_store(fname, cmd);
+		}
 	} else
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static void process_config(nstr_t cmd) {
+static void proc_config(nstr_t cmd) {
 	elog_cmd(cmd);
 	config_store("config", cmd);
 	mongrid_restart();
 }
 
-static void process_command(nstr_t cmd) {
+static void proc_cmd(nstr_t cmd, bool store) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "play"))
-		process_play(cmd);
+		proc_play(cmd, store);
 	else if (nstr_cmp_z(p1, "monitor"))
-		process_monitor(cmd);
+		proc_monitor(cmd, store);
 	else if (nstr_cmp_z(p1, "config"))
-		process_config(cmd);
+		proc_config(cmd);
 	else
 		elog_err("Invalid command: %s\n", nstr_z(cmd));
 }
 
-static void process_commands(nstr_t str) {
+static void proc_cmds(nstr_t str, bool store) {
 	while (nstr_len(str)) {
-		process_command(nstr_split(&str, RECORD_SEP));
+		proc_cmd(nstr_split(&str, RECORD_SEP), store);
 	}
 }
 
-static void load_command(const char *fname) {
-	char buf[128];
-	nstr_t str = nstr_make(buf, sizeof(buf), 0);
-	process_commands(config_load(fname, str));
-}
-
-static void load_commands(uint32_t mon) {
-	int i;
-	for (i = 0; i < mon; i++) {
-		char fname[16];
-		sprintf(fname, "monitor.%d", i);
-		load_command(fname);
-		sprintf(fname, "play.%d", i);
-		load_command(fname);
-	}
-}
-
-static void read_commands(void) {
+static void player_read_cmds(struct player *player) {
 	char buf[1024];
-
-	process_commands(cxn_recv(cxn, nstr_make(buf, sizeof(buf), 0)));
+	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	proc_cmds(cxn_recv(player->cxn, str), true);
 }
 
-static void *command_thread(void *arg) {
-	const char *port = arg;
-	cxn_bind(cxn, port);
+static void *cmd_thread(void *arg) {
+	struct player *player = arg;
+
+	cxn_bind(player->cxn, player->port);
 	while (true) {
-		read_commands();
+		player_read_cmds(player);
 	}
 	return NULL;
 }
 
-static void *status_thread(void *data) {
+static void player_send_status(struct player *player) {
 	char buf[256];
+
+	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	str = mongrid_status(str);
+	cxn_send(player->cxn, str);
+}
+
+static void *status_thread(void *arg) {
+	struct player *player = arg;
+
 	while (true) {
-		if (cxn_established(cxn)) {
-			nstr_t str = nstr_make(buf, sizeof(buf), 0);
-			str = mongrid_status(str);
-			cxn_send(cxn, str);
-		}
+		if (cxn_established(player->cxn))
+			player_send_status(player);
 		sleep(1);
 	}
 	return NULL;
+}
+
+static bool player_create_thread(struct player *player, void *(func)(void *)) {
+	pthread_t thread;
+	int rc = pthread_create(&thread, NULL, func, player);
+	if (rc)
+		elog_err("pthread_create: %d\n", strerror(rc));
+	return !rc;
 }
 
 static uint32_t load_config(void) {
@@ -200,32 +206,45 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
-static bool create_thread(void *(func)(void *), void *arg) {
-	pthread_t thread;
-	int rc = pthread_create(&thread, NULL, func, arg);
-	if (rc)
-		elog_err("pthread_create: %d\n", strerror(rc));
-	return !rc;
+static void load_cmd(const char *fname) {
+	char buf[128];
+	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	proc_cmds(config_load(fname, str), false);
+}
+
+static void load_cmds(uint32_t mon) {
+	int i;
+	for (i = 0; i < mon; i++) {
+		char fname[16];
+		sprintf(fname, "monitor.%d", i);
+		load_cmd(fname);
+		sprintf(fname, "play.%d", i);
+		load_cmd(fname);
+	}
 }
 
 void run_player(bool gui, bool stats, const char *port) {
+	struct player player;
+
+	memset(&player, 0, sizeof(struct player));
+	player.port = port;
 	config_init();
+	player.cxn = cxn_create();
 	mongrid_create(gui, stats);
-	cxn = cxn_create();
-	if (!create_thread(command_thread, (void *) port))
+	if (!player_create_thread(&player, cmd_thread))
 		goto fail;
-	if (!create_thread(status_thread, NULL))
+	if (!player_create_thread(&player, status_thread))
 		goto fail;
 	while (true) {
 		uint32_t mon = load_config();
 		if (mongrid_init(mon))
 			break;
-		load_commands(mon);
+		load_cmds(mon);
 		mongrid_run();
 		mongrid_reset();
 	}
 fail:
-	cxn_destroy(cxn);
 	mongrid_destroy();
+	cxn_destroy(player.cxn);
 	config_destroy();
 }
