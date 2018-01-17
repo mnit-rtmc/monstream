@@ -74,8 +74,8 @@ static const char *moncell_get_cam_id(const struct moncell *mc) {
 	return mc->stream.cam_id;
 }
 
-static void moncell_set_description(struct moncell *mc, const char *desc) {
-	strncpy(mc->description, desc, sizeof(mc->description));
+static void moncell_set_description(struct moncell *mc, nstr_t desc) {
+	nstr_wrap(mc->description, sizeof(mc->description), desc);
 }
 
 static const char MONCELL_CSS[] =
@@ -301,11 +301,10 @@ static void moncell_set_handle(struct moncell *mc) {
 	stream_set_handle(&mc->stream, handle);
 }
 
-static void moncell_play_stream(struct moncell *mc, const char *cam_id,
-	const char *loc, const char *desc, const char *encoding,
-	uint32_t latency)
+static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
+	nstr_t desc, nstr_t encoding, uint32_t latency)
 {
-	const char *d = moncell_has_title(mc) ? "" : desc;
+	nstr_t d = moncell_has_title(mc) ? nstr_make(NULL, 0, 0) : desc;
 	moncell_set_description(mc, desc);
 	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency);
 	/* Stopping the stream will trigger a restart */
@@ -512,8 +511,8 @@ void mongrid_set_mon(uint32_t idx, const char *mid, int32_t accent,
 	lock_release(&grid.lock, __func__);
 }
 
-void mongrid_play_stream(uint32_t idx, const char *cam_id, const char *loc,
-	const char *desc, const char *encoding, uint32_t latency)
+void mongrid_play_stream(uint32_t idx, nstr_t cam_id, nstr_t loc, nstr_t desc,
+	nstr_t encoding, uint32_t latency)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.n_cells) {

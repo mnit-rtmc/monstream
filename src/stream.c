@@ -551,16 +551,16 @@ static uint64_t fnv_hash(const char *str, uint32_t len) {
 	return h;
 }
 
-void stream_set_params(struct stream *st, const char *cam_id, const char *loc,
-	const char *desc, const char *encoding, uint32_t latency)
+void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
+	nstr_t desc, nstr_t encoding, uint32_t latency)
 {
-	strncpy(st->cam_id, cam_id, sizeof(st->cam_id));
-	strncpy(st->location, loc, sizeof(st->location));
-	strncpy(st->description, desc, sizeof(st->description));
-	strncpy(st->encoding, encoding, sizeof(st->encoding));
+	nstr_wrap(st->cam_id, sizeof(st->cam_id), cam_id);
+	nstr_wrap(st->location, sizeof(st->location), loc);
+	nstr_wrap(st->description, sizeof(st->description), desc);
+	nstr_wrap(st->encoding, sizeof(st->encoding), encoding);
 	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = latency;
-	st->loc_hash = fnv_hash(loc, strlen(loc));
+	st->loc_hash = fnv_hash(st->location, strlen(st->location));
 	st->n_starts = 0;
 }
 

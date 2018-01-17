@@ -51,28 +51,19 @@ static uint32_t parse_font_sz(nstr_t fsz) {
 
 static void proc_play(nstr_t cmd, bool store) {
 	nstr_t str = nstr_dup(cmd);
-	nstr_t p1 = nstr_split(&str, UNIT_SEP);	// "play"
-	nstr_t p2 = nstr_split(&str, UNIT_SEP);	// mon index
-	nstr_t p3 = nstr_split(&str, UNIT_SEP);	// camera ID
-	nstr_t p4 = nstr_split(&str, UNIT_SEP);	// stream URI
-	nstr_t p5 = nstr_split(&str, UNIT_SEP);	// encoding
-	nstr_t p6 = nstr_split(&str, UNIT_SEP);	// title
-	nstr_t p7 = nstr_split(&str, UNIT_SEP);	// latency
-	assert(nstr_cmp_z(p1, "play"));
-	int mon = nstr_parse_u32(p2);
+	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
+	nstr_t mid      = nstr_split(&str, UNIT_SEP);   // mon index
+	nstr_t cam_id   = nstr_split(&str, UNIT_SEP);   // camera ID
+	nstr_t loc      = nstr_split(&str, UNIT_SEP);   // stream URI
+	nstr_t encoding = nstr_split(&str, UNIT_SEP);   // encoding
+	nstr_t desc     = nstr_split(&str, UNIT_SEP);   // title
+	nstr_t lat      = nstr_split(&str, UNIT_SEP);   // latency
+	assert(nstr_cmp_z(play, "play"));
+	int mon = nstr_parse_u32(mid);
 	if (mon >= 0) {
-		char cam_id[20];
-		char desc[128];
-		char uri[128];
-		char encoding[16];
-
-		nstr_wrap(cam_id, sizeof(cam_id), p3);
-		nstr_wrap(uri, sizeof(uri), p4);
-		nstr_wrap(encoding, sizeof(encoding), p5);
-		nstr_wrap(desc, sizeof(desc), p6);
+		uint32_t latency = parse_latency(lat);
 		elog_cmd(cmd);
-		mongrid_play_stream(mon, cam_id, uri, desc, encoding,
-			parse_latency(p7));
+		mongrid_play_stream(mon, cam_id, loc, desc, encoding, latency);
 		if (store) {
 			char fname[16];
 			sprintf(fname, "play.%d", mon);
