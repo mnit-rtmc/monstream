@@ -54,6 +54,7 @@ struct mongrid {
 	bool		stats;
 	GtkWidget	*window;
 	GtkWidget	*tbox;
+	GtkWidget	*grid;
 	struct modebar	*mbar;
 	uint32_t	n_cells;
 	struct moncell	*cells;
@@ -356,6 +357,7 @@ static void hide_cursor(GtkWidget *window) {
 	GdkDisplay *display;
 	GdkCursor *cursor;
 
+	gtk_widget_realize(window);
 	display = gtk_widget_get_display(window);
 	cursor = gdk_cursor_new_for_display(display, GDK_BLANK_CURSOR);
 	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
@@ -395,11 +397,17 @@ void mongrid_create(bool gui, bool stats) {
 		gtk_init(NULL, NULL);
 		GtkWidget *window = gtk_window_new(0);
 		grid.window = window;
+		grid.tbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+		g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
 		// FIXME: only if joystick is plugged in
-		grid.mbar = modebar_create(grid.window);
+		if (true) {
+			grid.mbar = modebar_create(grid.window);
+			gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
+				grid.mbar), FALSE, FALSE, 0);
+		}
+		gtk_container_add(GTK_CONTAINER(grid.window), grid.tbox);
 		gtk_window_set_title((GtkWindow *) window, "MonStream");
 		gtk_window_fullscreen((GtkWindow *) window);
-		gtk_widget_realize(window);
 		hide_cursor(window);
 	}
 	if (stats)
@@ -409,8 +417,8 @@ void mongrid_create(bool gui, bool stats) {
 static void mongrid_init_gtk(uint32_t n_cells) {
 	int n_rows = get_rows(n_cells);
 	int n_cols = get_cols(n_cells);
-	grid.tbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-	GtkGrid *gr = (GtkGrid *) gtk_grid_new();
+	grid.grid = gtk_grid_new();
+	GtkGrid *gr = (GtkGrid *) grid.grid;
 	gtk_grid_set_column_spacing(gr, 4);
 	gtk_grid_set_row_spacing(gr, 4);
 	gtk_grid_set_column_homogeneous(gr, TRUE);
@@ -422,13 +430,7 @@ static void mongrid_init_gtk(uint32_t n_cells) {
 			gtk_grid_attach(gr, mc->box, c, r, 1, 1);
 		}
 	}
-	g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
-	if (grid.mbar) {
-		gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
-			grid.mbar), FALSE, FALSE, 0);
-	}
-	gtk_box_pack_end(GTK_BOX(grid.tbox), GTK_WIDGET(gr), TRUE, TRUE, 0);
-	gtk_container_add(GTK_CONTAINER(grid.window), grid.tbox);
+	gtk_box_pack_end(GTK_BOX(grid.tbox), GTK_WIDGET(grid.grid),TRUE,TRUE,0);
 	gtk_widget_show_all(grid.window);
 	gtk_widget_realize(grid.window);
 	mongrid_set_handles();
@@ -490,8 +492,8 @@ void mongrid_reset(void) {
 	grid.cells = NULL;
 	grid.n_cells = 0;
 	if (grid.window) {
-		gtk_container_remove(GTK_CONTAINER(grid.window),
-			(GtkWidget *) grid.tbox);
+		gtk_container_remove(GTK_CONTAINER(grid.tbox), grid.grid);
+		grid.grid = NULL;
 	}
 	lock_release(&grid.lock, __func__);
 }
