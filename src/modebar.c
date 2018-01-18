@@ -99,7 +99,7 @@ static bool modebar_has_cam(const struct modebar *mbar) {
 }
 
 static void modebar_set_text(struct modebar *mbar) {
-	char buf[8];
+	char buf[10];
 	bool has_cam = modebar_has_cam(mbar);
 	snprintf(buf, sizeof(buf), "Mon %s", mbar->mon);
 	modebar_set_text2(mbar, MODECELL_MON, buf);
