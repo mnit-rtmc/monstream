@@ -312,5 +312,10 @@ void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
 		nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
 		nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
 		modebar_set_text(mbar);
+	} else {
+		// Invalid monitor number
+		memset(mbar->mon, 0, sizeof(mbar->mon));
+		memset(mbar->cam, 0, sizeof(mbar->cam));
+		memset(mbar->seq, 0, sizeof(mbar->seq));
 	}
 }
