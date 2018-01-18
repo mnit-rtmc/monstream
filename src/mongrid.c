@@ -535,14 +535,11 @@ static const char UNIT_SEP = '\x1F';
 
 static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
 	char buf[64];
-	char failed[8] = "";
 
-	if (mc->failed)
-		strcpy(failed, "failed");
 	snprintf(buf, sizeof(buf), "status%c%d%c%s%c%s%c", UNIT_SEP,
 		idx, UNIT_SEP,
 		moncell_get_cam_id(mc), UNIT_SEP,
-		failed, RECORD_SEP);
+		(mc->failed) ? "failed" : "", RECORD_SEP);
 	nstr_cat_z(&str, buf);
 	return str;
 }
