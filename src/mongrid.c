@@ -555,6 +555,8 @@ nstr_t mongrid_status(nstr_t str) {
 }
 
 void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
+	lock_acquire(&grid.lock, __func__);
 	if (grid.mbar)
 		modebar_display(grid.mbar, mon, cam, seq);
+	lock_release(&grid.lock, __func__);
 }
