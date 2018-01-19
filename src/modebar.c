@@ -181,17 +181,21 @@ static char get_key_char(const GdkEventKey *key) {
 	}
 }
 
+static void modebar_clear_entry(struct modebar *mbar) {
+	memset(mbar->entry, 0, sizeof(mbar->entry));
+}
+
 static void modebar_set_mon(struct modebar *mbar) {
 	// FIXME: send query to IRIS
 	strncpy(mbar->mon, mbar->entry, sizeof(mbar->mon));
 	memset(mbar->cam, 0, sizeof(mbar->cam));
 	memset(mbar->seq, 0, sizeof(mbar->seq));
-	memset(mbar->entry, 0, sizeof(mbar->entry));
+	modebar_clear_entry(mbar);
 }
 
 static void modebar_set_cam(struct modebar *mbar) {
 	// FIXME: send request to IRIS
-	memset(mbar->entry, 0, sizeof(mbar->entry));
+	modebar_clear_entry(mbar);
 }
 
 static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
@@ -212,15 +216,15 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		if (modebar_has_mon(mbar))
 			modebar_set_cam(mbar);
 		else
-			modebar_set_mon(mbar);
+			modebar_clear_entry(mbar);
 	}
 	else if ('*' == k) {
 		// FIXME: set sequence
-		memset(mbar->entry, 0, sizeof(mbar->entry));
+		modebar_clear_entry(mbar);
 	}
 	else if ('/' == k) {
 		// FIXME: set preset
-		memset(mbar->entry, 0, sizeof(mbar->entry));
+		modebar_clear_entry(mbar);
 	}
 	modebar_set_text(mbar);
 }
