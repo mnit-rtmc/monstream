@@ -153,8 +153,12 @@ static gboolean do_update_title(gpointer data) {
 	struct moncell *mc = (struct moncell *) data;
 	lock_acquire(&grid.lock, __func__);
 	/* moncell may have been freed while timer ran */
-	if (is_moncell_valid(mc))
+	if (is_moncell_valid(mc)) {
 		moncell_update_accent_title(mc);
+		/* only update modebar if this is the first monitor */
+		if (grid.mbar && (mc == grid.cells))
+			modebar_set_accent(grid.mbar, mc->accent, mc->font_sz);
+	}
 	lock_release(&grid.lock, __func__);
 	return FALSE;
 }
@@ -401,7 +405,7 @@ void mongrid_create(bool gui, bool stats) {
 		g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
 		// FIXME: only if joystick is plugged in
 		if (true) {
-			grid.mbar = modebar_create(grid.window);
+			grid.mbar = modebar_create(grid.window, &grid.lock);
 			gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
 				grid.mbar), FALSE, FALSE, 0);
 		}
@@ -506,8 +510,6 @@ void mongrid_set_mon(uint32_t idx, nstr_t mid, int32_t accent, bool aspect,
 		struct moncell *mc = grid.cells + idx;
 		moncell_set_mon(mc, mid, accent, aspect, font_sz, crop, hgap,
 			vgap);
-		if (grid.mbar && (0 == idx))
-			modebar_set_accent(grid.mbar, accent, font_sz);
 	}
 	lock_release(&grid.lock, __func__);
 }

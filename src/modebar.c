@@ -18,6 +18,7 @@
 #include <string.h>
 #include <gtk/gtk.h>
 #include "elog.h"
+#include "modebar.h"
 
 #define ACCENT_GRAY	0x444444
 #define COLOR_MON	0xFFFF88
@@ -36,6 +37,7 @@ struct modecell {
 #define MODECELL_LAST	5
 
 struct modebar {
+	struct lock	*lock;
 	GtkWidget	*box;
 	GtkCssProvider	*css_provider;
 	struct modecell cells[MODECELL_LAST];
@@ -236,9 +238,10 @@ static gboolean key_press(GtkWidget *widget, GdkEventKey *key, gpointer data) {
 	return FALSE;
 }
 
-struct modebar *modebar_create(GtkWidget *window) {
+struct modebar *modebar_create(GtkWidget *window, struct lock *lock) {
 	struct modebar *mbar = malloc(sizeof(struct modebar));
 	memset(mbar, 0, sizeof(struct modebar));
+	mbar->lock = lock;
 	mbar->css_provider = gtk_css_provider_new();
 	mbar->box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 	gtk_box_set_homogeneous(GTK_BOX(mbar->box), TRUE);
@@ -312,15 +315,23 @@ nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
 	return str;
 }
 
+static gboolean do_modebar_set_text(gpointer data) {
+	struct modebar *mbar = data;
+	lock_acquire(mbar->lock, __func__);
+	modebar_set_text(mbar);
+	lock_release(mbar->lock, __func__);
+	return FALSE;
+}
+
 void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
 	if (nstr_cmp_z(mon, mbar->mon)) {
 		nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
 		nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
-		modebar_set_text(mbar);
 	} else {
 		// Invalid monitor number
 		memset(mbar->mon, 0, sizeof(mbar->mon));
 		memset(mbar->cam, 0, sizeof(mbar->cam));
 		memset(mbar->seq, 0, sizeof(mbar->seq));
 	}
+	g_timeout_add(0, do_modebar_set_text, mbar);
 }
