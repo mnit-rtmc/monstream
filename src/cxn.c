@@ -17,6 +17,7 @@
 #include <netdb.h>		/* for socket stuff */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "elog.h"
