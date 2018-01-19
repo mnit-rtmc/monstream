@@ -15,6 +15,7 @@
 #include <assert.h>
 #define _MULTI_THREADED
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,6 +30,8 @@
 struct player {
 	struct cxn *cxn;
 	const char *port;
+	pthread_t  cmd_tid;
+	pthread_t  stat_tid;
 };
 
 /* ASCII separators */
@@ -188,12 +191,16 @@ static void *status_thread(void *arg) {
 	return NULL;
 }
 
-static bool player_create_thread(struct player *plyr, void *(func)(void *)) {
-	pthread_t thread;
-	int rc = pthread_create(&thread, NULL, func, plyr);
-	if (rc)
+static pthread_t player_create_thread(struct player *plyr,
+	void *(func)(void *))
+{
+	pthread_t tid;
+	int rc = pthread_create(&tid, NULL, func, plyr);
+	if (rc) {
 		elog_err("pthread_create: %d\n", strerror(rc));
-	return !rc;
+		return 0;
+	} else
+		return tid;
 }
 
 static uint32_t load_config(void) {
@@ -230,6 +237,17 @@ static void player_load_cmds(struct player *plyr, uint32_t mon) {
 	}
 }
 
+static void player_sig_handler(int n_sig) {
+	// just ignore
+}
+
+static void player_install_handler(struct player *plyr) {
+	struct sigaction sa;
+	sa.sa_handler = player_sig_handler;
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGUSR1, &sa, NULL);
+}
+
 void run_player(bool gui, bool stats, const char *port) {
 	struct player plyr;
 
@@ -238,19 +256,17 @@ void run_player(bool gui, bool stats, const char *port) {
 	config_init();
 	plyr.cxn = cxn_create();
 	mongrid_create(gui, stats);
-	if (!player_create_thread(&plyr, cmd_thread))
-		goto fail;
-	if (!player_create_thread(&plyr, status_thread))
-		goto fail;
-	while (true) {
+	plyr.cmd_tid = player_create_thread(&plyr, cmd_thread);
+	plyr.stat_tid = player_create_thread(&plyr, status_thread);
+	player_install_handler(&plyr);
+	while (plyr.cmd_tid && plyr.stat_tid) {
 		uint32_t mon = load_config();
-		if (mongrid_init(mon))
+		if (mongrid_init(mon, plyr.stat_tid))
 			break;
 		player_load_cmds(&plyr, mon);
 		mongrid_run();
 		mongrid_reset();
 	}
-fail:
 	mongrid_destroy();
 	cxn_destroy(plyr.cxn);
 	config_destroy();

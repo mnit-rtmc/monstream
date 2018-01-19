@@ -440,7 +440,7 @@ static void mongrid_init_gtk(uint32_t n_cells) {
 	mongrid_set_handles();
 }
 
-int32_t mongrid_init(uint32_t num) {
+int32_t mongrid_init(uint32_t num, pthread_t tid) {
 	lock_acquire(&grid.lock, __func__);
 	if (num > 16) {
 		grid.n_cells = 0;
@@ -451,8 +451,11 @@ int32_t mongrid_init(uint32_t num) {
 	grid.cells = calloc(grid.n_cells, sizeof(struct moncell));
 	for (uint32_t n = 0; n < grid.n_cells; n++)
 		moncell_init(grid.cells + n, n);
-	if (grid.window)
+	if (grid.window) {
 		mongrid_init_gtk(grid.n_cells);
+		if (grid.mbar)
+			modebar_set_tid(grid.mbar, tid);
+	}
 	grid.running = false;
 	lock_release(&grid.lock, __func__);
 	return 0;
@@ -553,7 +556,7 @@ nstr_t mongrid_status(nstr_t str) {
 	for (uint32_t n = 0; n < grid.n_cells; n++)
 		str = moncell_status(grid.cells + n, str, n);
 	if (grid.mbar)
-		str = modebar_query(grid.mbar, str);
+		str = modebar_status(grid.mbar, str);
 	lock_release(&grid.lock, __func__);
 	return str;
 }

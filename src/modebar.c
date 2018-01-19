@@ -38,6 +38,7 @@ struct modecell {
 
 struct modebar {
 	struct lock	*lock;
+	pthread_t	tid;
 	GtkWidget	*box;
 	GtkCssProvider	*css_provider;
 	struct modecell cells[MODECELL_LAST];
@@ -45,6 +46,8 @@ struct modebar {
 	char		mon[6];
 	char		cam[6];
 	char            seq[6];
+	char            cam_req[6];
+	char            seq_req[6];
 };
 
 static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
@@ -196,7 +199,9 @@ static void modebar_set_mon(struct modebar *mbar) {
 }
 
 static void modebar_set_cam(struct modebar *mbar) {
-	// FIXME: send request to IRIS
+	strncpy(mbar->cam_req, mbar->entry, sizeof(mbar->cam_req));
+	if (mbar->tid)
+		pthread_kill(mbar->tid, SIGUSR1);
 	modebar_clear_entry(mbar);
 }
 
@@ -257,6 +262,10 @@ struct modebar *modebar_create(GtkWidget *window, struct lock *lock) {
 	return mbar;
 }
 
+void modebar_set_tid(struct modebar *mbar, pthread_t tid) {
+	mbar->tid = tid;
+}
+
 GtkWidget *modebar_get_box(struct modebar *mbar) {
 	return mbar->box;
 }
@@ -304,14 +313,31 @@ void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
-	if (modebar_has_mon(mbar)) {
-		char buf[64];
-		snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
-			RECORD_SEP);
-		nstr_cat_z(&str, buf);
-	}
+static nstr_t modebar_switch(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "switch%c%s%c%s%c", UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->cam_req, RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	memset(mbar->cam_req, 0, sizeof(mbar->cam_req));
 	return str;
+}
+
+static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	return str;
+}
+
+nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
+	if (modebar_has_mon(mbar)) {
+		if (strlen(mbar->cam_req))
+			return modebar_switch(mbar, str);
+		else
+			return modebar_query(mbar, str);
+	} else
+		return str;
 }
 
 static gboolean do_modebar_set_text(gpointer data) {

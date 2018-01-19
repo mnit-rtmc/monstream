@@ -4,7 +4,7 @@
 #include "nstr.h"
 
 void mongrid_create(bool gui, bool stats);
-int32_t mongrid_init(uint32_t num);
+int32_t mongrid_init(uint32_t num, pthread_t tid);
 void mongrid_run(void);
 void mongrid_restart(void);
 void mongrid_reset(void);
