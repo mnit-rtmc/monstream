@@ -93,7 +93,7 @@ static void modebar_set_text2(struct modebar *mbar, int n_cell, const char *t) {
 	gtk_label_set_text(GTK_LABEL(mcell->lbl), t);
 }
 
-static bool modebar_has_mon(const struct modebar *mbar) {
+bool modebar_has_mon(const struct modebar *mbar) {
 	return strlen(mbar->mon);
 }
 
@@ -189,7 +189,6 @@ static void modebar_clear_entry(struct modebar *mbar) {
 }
 
 static void modebar_set_mon(struct modebar *mbar) {
-	// FIXME: send query to IRIS
 	strncpy(mbar->mon, mbar->entry, sizeof(mbar->mon));
 	memset(mbar->cam, 0, sizeof(mbar->cam));
 	memset(mbar->seq, 0, sizeof(mbar->seq));

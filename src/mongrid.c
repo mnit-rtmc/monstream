@@ -558,6 +558,10 @@ nstr_t mongrid_status(nstr_t str) {
 	return str;
 }
 
+bool mongrid_mon_selected(void) {
+	return (grid.mbar) && modebar_has_mon(grid.mbar);
+}
+
 void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
 	lock_acquire(&grid.lock, __func__);
 	if (grid.mbar)

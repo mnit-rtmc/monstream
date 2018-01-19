@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>		/* strerror */
-#include <unistd.h>		/* sleep */
+#include <time.h>		/* nanosleep */
 #include "elog.h"
 #include "nstr.h"
 #include "config.h"
@@ -167,11 +167,23 @@ static void player_send_status(struct player *plyr) {
 
 static void *status_thread(void *arg) {
 	struct player *plyr = arg;
+	struct timespec ts;
 
 	while (true) {
-		if (cxn_established(plyr->cxn))
+		if (cxn_established(plyr->cxn)) {
 			player_send_status(plyr);
-		sleep(1);
+			if (mongrid_mon_selected()) {
+				ts.tv_sec = 0;
+				ts.tv_nsec = 333333333;
+			} else {
+				ts.tv_sec = 1;
+				ts.tv_nsec = 0;
+			}
+		} else {
+			ts.tv_sec = 2;
+			ts.tv_nsec = 0;
+		}
+		nanosleep(&ts, NULL);
 	}
 	return NULL;
 }
