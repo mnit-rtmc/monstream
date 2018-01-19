@@ -199,9 +199,18 @@ static void modebar_set_mon(struct modebar *mbar) {
 }
 
 static void modebar_set_cam(struct modebar *mbar) {
-	strncpy(mbar->cam_req, mbar->entry, sizeof(mbar->cam_req));
-	if (mbar->tid)
+	if (modebar_has_mon(mbar) && mbar->tid) {
+		strncpy(mbar->cam_req, mbar->entry, sizeof(mbar->cam_req));
 		pthread_kill(mbar->tid, SIGUSR1);
+	}
+	modebar_clear_entry(mbar);
+}
+
+static void modebar_set_seq(struct modebar *mbar) {
+	if (modebar_has_mon(mbar) && mbar->tid) {
+		strncpy(mbar->seq_req, mbar->entry, sizeof(mbar->seq_req));
+		pthread_kill(mbar->tid, SIGUSR1);
+	}
 	modebar_clear_entry(mbar);
 }
 
@@ -216,19 +225,12 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 			mbar->entry[len + 1] = 0;
 		}
 	}
-	else if ('.' == k) {
+	else if ('.' == k)
 		modebar_set_mon(mbar);
-	}
-	else if ('\n' == k) {
-		if (modebar_has_mon(mbar))
-			modebar_set_cam(mbar);
-		else
-			modebar_clear_entry(mbar);
-	}
-	else if ('*' == k) {
-		// FIXME: set sequence
-		modebar_clear_entry(mbar);
-	}
+	else if ('\n' == k)
+		modebar_set_cam(mbar);
+	else if ('*' == k)
+		modebar_set_seq(mbar);
 	else if ('/' == k) {
 		// FIXME: set preset
 		modebar_clear_entry(mbar);
@@ -322,6 +324,15 @@ static nstr_t modebar_switch(struct modebar *mbar, nstr_t str) {
 	return str;
 }
 
+static nstr_t modebar_sequence(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "sequence%c%s%c%s%c", UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->seq_req, RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	memset(mbar->seq_req, 0, sizeof(mbar->seq_req));
+	return str;
+}
+
 static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
 	char buf[64];
 	snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
@@ -334,6 +345,8 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
 	if (modebar_has_mon(mbar)) {
 		if (strlen(mbar->cam_req))
 			return modebar_switch(mbar, str);
+		else if (strlen(mbar->seq_req))
+			return modebar_sequence(mbar, str);
 		else
 			return modebar_query(mbar, str);
 	} else
