@@ -48,6 +48,8 @@ struct modebar {
 	char            seq[6];
 	char            cam_req[6];
 	char            seq_req[6];
+	bool		prev_req;
+	bool		next_req;
 };
 
 static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
@@ -229,6 +231,10 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		modebar_set_mon(mbar);
 	else if ('\n' == k)
 		modebar_set_cam(mbar);
+	else if ('-' == k)
+		mbar->prev_req = true;
+	else if ('+' == k)
+		mbar->next_req = true;
 	else if ('*' == k)
 		modebar_set_seq(mbar);
 	else if ('/' == k) {
@@ -324,6 +330,24 @@ static nstr_t modebar_switch(struct modebar *mbar, nstr_t str) {
 	return str;
 }
 
+static nstr_t modebar_prev(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "previous%c%s%c", UNIT_SEP, mbar->mon,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	mbar->prev_req = false;
+	return str;
+}
+
+static nstr_t modebar_next(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "next%c%s%c", UNIT_SEP, mbar->mon,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	mbar->next_req = false;
+	return str;
+}
+
 static nstr_t modebar_sequence(struct modebar *mbar, nstr_t str) {
 	char buf[64];
 	snprintf(buf, sizeof(buf), "sequence%c%s%c%s%c", UNIT_SEP, mbar->mon,
@@ -345,6 +369,10 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
 	if (modebar_has_mon(mbar)) {
 		if (strlen(mbar->cam_req))
 			return modebar_switch(mbar, str);
+		else if (mbar->prev_req)
+			return modebar_prev(mbar, str);
+		else if (mbar->next_req)
+			return modebar_next(mbar, str);
 		else if (strlen(mbar->seq_req))
 			return modebar_sequence(mbar, str);
 		else
