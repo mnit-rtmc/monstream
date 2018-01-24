@@ -51,6 +51,10 @@ struct modebar {
 	char            preset_req[6];
 	bool		prev_req;
 	bool		next_req;
+	bool		ptz;
+	int16_t		pan;
+	int16_t		tilt;
+	int16_t		zoom;
 };
 
 static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
@@ -324,6 +328,38 @@ void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
 		elog_err("CSS error: %s\n", err->message);
 }
 
+#define PTZ_THRESH 8192
+
+void modebar_set_pan(struct modebar *mbar, int16_t pan) {
+	int p = mbar->pan;
+	mbar->pan = pan;
+	if (pan) {
+		mbar->ptz = true;
+		if (abs(p - (int) pan) > PTZ_THRESH)
+			pthread_kill(mbar->tid, SIGUSR1);
+	}
+}
+
+void modebar_set_tilt(struct modebar *mbar, int16_t tilt) {
+	int t = mbar->tilt;
+	mbar->tilt = tilt;
+	if (tilt) {
+		mbar->ptz = true;
+		if (abs(t - (int) tilt) > PTZ_THRESH)
+			pthread_kill(mbar->tid, SIGUSR1);
+	}
+}
+
+void modebar_set_zoom(struct modebar *mbar, int16_t zoom) {
+	int z = mbar->zoom;
+	mbar->zoom = zoom;
+	if (zoom) {
+		mbar->ptz = true;
+		if ((z > 0 && zoom <= 0) || (z < 0 && zoom >= 0))
+			pthread_kill(mbar->tid, SIGUSR1);
+	}
+}
+
 /* ASCII separators */
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
@@ -377,6 +413,24 @@ static nstr_t modebar_preset(struct modebar *mbar, nstr_t str) {
 	return str;
 }
 
+static nstr_t modebar_ptz(struct modebar *mbar, nstr_t str) {
+	float pan = mbar->pan / 32767.0f;
+	float tilt = mbar->tilt / 32767.0f;
+	float zoom = mbar->zoom / 32767.0f;
+	char buf[64];
+	snprintf(buf, sizeof(buf), "ptz%c%s%c%s%c%6.4f%c%6.4f%c%6.4f%c",
+		UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->cam,
+		UNIT_SEP, pan,
+		UNIT_SEP, tilt,
+		UNIT_SEP, zoom,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	if ((0 == mbar->pan) && (0 == mbar->tilt) && (0 == mbar->zoom))
+		mbar->ptz = false;
+	return str;
+}
+
 static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
 	char buf[64];
 	snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
@@ -397,6 +451,8 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
 			return modebar_sequence(mbar, str);
 		else if (strlen(mbar->preset_req))
 			return modebar_preset(mbar, str);
+		else if (mbar->ptz)
+			return modebar_ptz(mbar, str);
 		else
 			return modebar_query(mbar, str);
 	} else

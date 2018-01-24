@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2018  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#define VERSION "0.36"
-#define BANNER "monstream: v" VERSION "  Copyright (C) 2017  MnDOT\n"
+#define VERSION "0.37"
+#define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2018  MnDOT\n"
 
 void run_player(bool gui, bool stats, const char *port);
 

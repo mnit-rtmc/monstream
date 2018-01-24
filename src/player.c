@@ -15,12 +15,17 @@
 #include <assert.h>
 #define _MULTI_THREADED
 #include <pthread.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>		/* strerror */
+#include <sys/stat.h>
 #include <time.h>		/* nanosleep */
+#include <unistd.h>
+#include <linux/joystick.h>
 #include "elog.h"
 #include "nstr.h"
 #include "config.h"
@@ -30,8 +35,10 @@
 struct player {
 	struct cxn *cxn;
 	const char *port;
+	int        joy_fd;
 	pthread_t  cmd_tid;
 	pthread_t  stat_tid;
+	pthread_t  joy_tid;
 };
 
 /* ASCII separators */
@@ -191,13 +198,45 @@ static void *status_thread(void *arg) {
 	return NULL;
 }
 
+static void player_joy_axis(struct player *plyr, struct js_event *ev) {
+	if (0 == ev->number)
+		mongrid_set_pan(ev->value);
+	else if (1 == ev->number)
+		mongrid_set_tilt(-ev->value);
+	else if (2 == ev->number)
+		mongrid_set_zoom(ev->value);
+}
+
+static void player_joy_event(struct player *plyr, struct js_event *ev) {
+	if (ev->type & JS_EVENT_INIT)
+		return;
+	if (ev->type & JS_EVENT_AXIS)
+		player_joy_axis(plyr, ev);
+}
+
+static void *joy_thread(void *arg) {
+	struct player *plyr = arg;
+	struct js_event ev;
+
+	while (true) {
+		int n_bytes = read(plyr->joy_fd, &ev, sizeof(ev));
+		if (n_bytes < 0) {
+			elog_err("joystick read: %s\n", strerror(errno));
+			break;
+		}
+		if (n_bytes == sizeof(ev))
+			player_joy_event(plyr, &ev);
+	}
+	return NULL;
+}
+
 static pthread_t player_create_thread(struct player *plyr,
 	void *(func)(void *))
 {
 	pthread_t tid;
 	int rc = pthread_create(&tid, NULL, func, plyr);
 	if (rc) {
-		elog_err("pthread_create: %d\n", strerror(rc));
+		elog_err("pthread_create: %s\n", strerror(rc));
 		return 0;
 	} else
 		return tid;
@@ -237,6 +276,13 @@ static void player_load_cmds(struct player *plyr, uint32_t mon) {
 	}
 }
 
+static void player_open_joystick(struct player *plyr) {
+	const char *path = "/dev/input/js0";
+	plyr->joy_fd = open(path, O_RDONLY | O_NOFOLLOW, 0);
+	if (plyr->joy_fd < 0)
+		elog_err("Open %s: %s\n", path, strerror(errno));
+}
+
 static void player_sig_handler(int n_sig) {
 	// just ignore
 }
@@ -255,9 +301,12 @@ void run_player(bool gui, bool stats, const char *port) {
 	plyr.port = port;
 	config_init();
 	plyr.cxn = cxn_create();
-	mongrid_create(gui, stats);
+	player_open_joystick(&plyr);
+	mongrid_create(gui, stats, plyr.joy_fd > 0);
 	plyr.cmd_tid = player_create_thread(&plyr, cmd_thread);
 	plyr.stat_tid = player_create_thread(&plyr, status_thread);
+	if (plyr.joy_fd > 0)
+		plyr.joy_tid = player_create_thread(&plyr, joy_thread);
 	player_install_handler(&plyr);
 	while (plyr.cmd_tid && plyr.stat_tid) {
 		uint32_t mon = load_config();

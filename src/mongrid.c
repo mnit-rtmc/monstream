@@ -392,7 +392,7 @@ static gboolean do_stats(gpointer data) {
 	return TRUE;
 }
 
-void mongrid_create(bool gui, bool stats) {
+void mongrid_create(bool gui, bool stats, bool modebar) {
 	gst_init(NULL, NULL);
 	memset(&grid, 0, sizeof(struct mongrid));
 	lock_init(&grid.lock);
@@ -403,8 +403,7 @@ void mongrid_create(bool gui, bool stats) {
 		grid.window = window;
 		grid.tbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 		g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
-		// FIXME: only if joystick is plugged in
-		if (true) {
+		if (modebar) {
 			grid.mbar = modebar_create(grid.window, &grid.lock);
 			gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
 				grid.mbar), FALSE, FALSE, 0);
@@ -570,4 +569,19 @@ void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
 	if (grid.mbar)
 		modebar_display(grid.mbar, mon, cam, seq);
 	lock_release(&grid.lock, __func__);
+}
+
+void mongrid_set_pan(int16_t pan) {
+	if (grid.mbar)
+		modebar_set_pan(grid.mbar, pan);
+}
+
+void mongrid_set_tilt(int16_t tilt) {
+	if (grid.mbar)
+		modebar_set_tilt(grid.mbar, tilt);
+}
+
+void mongrid_set_zoom(int16_t zoom) {
+	if (grid.mbar)
+		modebar_set_zoom(grid.mbar, zoom);
 }
