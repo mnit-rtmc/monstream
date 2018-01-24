@@ -412,14 +412,8 @@ static gboolean do_modebar_set_text(gpointer data) {
 }
 
 void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
-	if (nstr_cmp_z(mon, mbar->mon)) {
-		nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
-		nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
-	} else {
-		// Invalid monitor number
-		memset(mbar->mon, 0, sizeof(mbar->mon));
-		memset(mbar->cam, 0, sizeof(mbar->cam));
-		memset(mbar->seq, 0, sizeof(mbar->seq));
-	}
+	nstr_wrap(mbar->mon, sizeof(mbar->mon), mon);
+	nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
+	nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
 	g_timeout_add(0, do_modebar_set_text, mbar);
 }
