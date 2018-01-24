@@ -48,6 +48,7 @@ struct modebar {
 	char            seq[6];
 	char            cam_req[6];
 	char            seq_req[6];
+	char            preset_req[6];
 	bool		prev_req;
 	bool		next_req;
 };
@@ -216,6 +217,14 @@ static void modebar_set_seq(struct modebar *mbar) {
 	modebar_clear_entry(mbar);
 }
 
+static void modebar_set_preset(struct modebar *mbar) {
+	if (modebar_has_mon(mbar) && modebar_has_cam(mbar) && mbar->tid) {
+		strncpy(mbar->preset_req, mbar->entry,sizeof(mbar->preset_req));
+		pthread_kill(mbar->tid, SIGUSR1);
+	}
+	modebar_clear_entry(mbar);
+}
+
 static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 	char k = get_key_char(key);
 	if (k >= '0' && k <= '9') {
@@ -237,10 +246,8 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		mbar->next_req = true;
 	else if ('*' == k)
 		modebar_set_seq(mbar);
-	else if ('/' == k) {
-		// FIXME: set preset
-		modebar_clear_entry(mbar);
-	}
+	else if ('/' == k)
+		modebar_set_preset(mbar);
 	modebar_set_text(mbar);
 }
 
@@ -357,6 +364,19 @@ static nstr_t modebar_sequence(struct modebar *mbar, nstr_t str) {
 	return str;
 }
 
+static nstr_t modebar_preset(struct modebar *mbar, nstr_t str) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "preset%c%s%c%s%c%s%c%s%c",
+		UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->cam,
+		UNIT_SEP, "recall",
+		UNIT_SEP, mbar->preset_req,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	memset(mbar->preset_req, 0, sizeof(mbar->preset_req));
+	return str;
+}
+
 static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
 	char buf[64];
 	snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
@@ -375,6 +395,8 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
 			return modebar_next(mbar, str);
 		else if (strlen(mbar->seq_req))
 			return modebar_sequence(mbar, str);
+		else if (strlen(mbar->preset_req))
+			return modebar_preset(mbar, str);
 		else
 			return modebar_query(mbar, str);
 	} else
