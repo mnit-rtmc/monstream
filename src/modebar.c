@@ -214,6 +214,16 @@ static void modebar_set_cam(struct modebar *mbar) {
 	modebar_clear_entry(mbar);
 }
 
+static void modebar_set_prev(struct modebar *mbar) {
+	mbar->prev_req = true;
+	pthread_kill(mbar->tid, SIGUSR1);
+}
+
+static void modebar_set_next(struct modebar *mbar) {
+	mbar->next_req = true;
+	pthread_kill(mbar->tid, SIGUSR1);
+}
+
 static void modebar_set_seq(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && mbar->tid) {
 		strncpy(mbar->seq_req, mbar->entry, sizeof(mbar->seq_req));
@@ -246,9 +256,9 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 	else if ('\n' == k)
 		modebar_set_cam(mbar);
 	else if ('-' == k)
-		mbar->prev_req = true;
+		modebar_set_prev(mbar);
 	else if ('+' == k)
-		mbar->next_req = true;
+		modebar_set_next(mbar);
 	else if ('*' == k)
 		modebar_set_seq(mbar);
 	else if ('/' == k)
@@ -371,7 +381,19 @@ static void modebar_joy_axis(struct modebar *mbar, struct js_event *ev) {
 }
 
 static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
-elog_err("joystick button: %d %d\n", ev->number, ev->value);
+	if (ev->value) {
+		// FIXME: CH Products ID: 068e:00ca
+		switch (ev->number) {
+		case 10:
+			modebar_set_prev(mbar);
+			break;
+		case 11:
+			modebar_set_next(mbar);
+			break;
+		default:
+			break;
+		}
+	}
 }
 
 void modebar_joy_event(struct modebar *mbar, struct js_event *ev) {
