@@ -40,7 +40,7 @@ Sent in response to query message.
 1. display
 2. Monitor ID
 3. Camera ID
-4. Sequence #
+4. Sequence # (ending with " if paused)
 
 ## Messages from VDU to IRIS
 
@@ -81,7 +81,7 @@ Sent every 300 ms when USB joystick connected.
 
 1. sequence
 2. Monitor ID
-3. Sequence #
+3. pause / Sequence #
 
 ### Pan/tilt/zoom
 

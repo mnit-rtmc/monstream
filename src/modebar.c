@@ -226,7 +226,8 @@ static void modebar_set_next(struct modebar *mbar) {
 
 static void modebar_set_seq(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && mbar->tid) {
-		strncpy(mbar->seq_req, mbar->entry, sizeof(mbar->seq_req));
+		const char *e = (strlen(mbar->entry)) ? mbar->entry : "pause";
+		strncpy(mbar->seq_req, e, sizeof(mbar->seq_req));
 		pthread_kill(mbar->tid, SIGUSR1);
 	}
 	modebar_clear_entry(mbar);
