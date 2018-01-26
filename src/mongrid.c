@@ -571,17 +571,20 @@ void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
 	lock_release(&grid.lock, __func__);
 }
 
-void mongrid_set_pan(int16_t pan) {
-	if (grid.mbar)
-		modebar_set_pan(grid.mbar, pan);
-}
-
-void mongrid_set_tilt(int16_t tilt) {
-	if (grid.mbar)
-		modebar_set_tilt(grid.mbar, tilt);
-}
-
-void mongrid_set_zoom(int16_t zoom) {
-	if (grid.mbar)
-		modebar_set_zoom(grid.mbar, zoom);
+bool mongrid_joy_event(int fd) {
+	if (grid.mbar) {
+		struct js_event ev;
+		int n_bytes = read(fd, &ev, sizeof(ev));
+		if (n_bytes < 0) {
+			elog_err("joystick read: %s\n", strerror(errno));
+			return false;
+		}
+		if (n_bytes == sizeof(ev)) {
+			lock_acquire(&grid.lock, __func__);
+			modebar_joy_event(grid.mbar, &ev);
+			lock_release(&grid.lock, __func__);
+		}
+		return true;
+	} else
+		return false;
 }

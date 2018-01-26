@@ -2,6 +2,7 @@
 #define MODEBAR_H
 
 #include <gtk/gtk.h>
+#include <linux/joystick.h>
 #include "nstr.h"
 #include "lock.h"
 
@@ -12,8 +13,6 @@ bool modebar_has_mon(const struct modebar *mbar);
 nstr_t modebar_status(struct modebar *mbar, nstr_t str);
 void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq);
 void modebar_set_tid(struct modebar *mbar, pthread_t tid);
-void modebar_set_pan(struct modebar *mbar, int16_t pan);
-void modebar_set_tilt(struct modebar *mbar, int16_t tilt);
-void modebar_set_zoom(struct modebar *mbar, int16_t zoom);
+void modebar_joy_event(struct modebar *mbar, struct js_event *ev);
 
 #endif

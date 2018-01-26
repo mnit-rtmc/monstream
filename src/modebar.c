@@ -13,6 +13,7 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -330,7 +331,7 @@ void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
 
 #define PTZ_THRESH 8192
 
-void modebar_set_pan(struct modebar *mbar, int16_t pan) {
+static void modebar_set_pan(struct modebar *mbar, int16_t pan) {
 	int p = mbar->pan;
 	mbar->pan = pan;
 	if (pan) {
@@ -340,7 +341,7 @@ void modebar_set_pan(struct modebar *mbar, int16_t pan) {
 	}
 }
 
-void modebar_set_tilt(struct modebar *mbar, int16_t tilt) {
+static void modebar_set_tilt(struct modebar *mbar, int16_t tilt) {
 	int t = mbar->tilt;
 	mbar->tilt = tilt;
 	if (tilt) {
@@ -350,7 +351,7 @@ void modebar_set_tilt(struct modebar *mbar, int16_t tilt) {
 	}
 }
 
-void modebar_set_zoom(struct modebar *mbar, int16_t zoom) {
+static void modebar_set_zoom(struct modebar *mbar, int16_t zoom) {
 	int z = mbar->zoom;
 	mbar->zoom = zoom;
 	if (zoom) {
@@ -358,6 +359,28 @@ void modebar_set_zoom(struct modebar *mbar, int16_t zoom) {
 		if ((z > 0 && zoom <= 0) || (z < 0 && zoom >= 0))
 			pthread_kill(mbar->tid, SIGUSR1);
 	}
+}
+
+static void modebar_joy_axis(struct modebar *mbar, struct js_event *ev) {
+	if (0 == ev->number)
+		modebar_set_pan(mbar, ev->value);
+	else if (1 == ev->number)
+		modebar_set_tilt(mbar, -ev->value);
+	else if (2 == ev->number)
+		modebar_set_zoom(mbar, ev->value);
+}
+
+static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
+elog_err("joystick button: %d %d\n", ev->number, ev->value);
+}
+
+void modebar_joy_event(struct modebar *mbar, struct js_event *ev) {
+	if (ev->type & JS_EVENT_INIT)
+		return;
+	if (ev->type & JS_EVENT_AXIS)
+		modebar_joy_axis(mbar, ev);
+	if (ev->type & JS_EVENT_BUTTON)
+		modebar_joy_button(mbar, ev);
 }
 
 /* ASCII separators */

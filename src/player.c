@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <time.h>		/* nanosleep */
 #include <unistd.h>
-#include <linux/joystick.h>
 #include "elog.h"
 #include "nstr.h"
 #include "config.h"
@@ -198,34 +197,11 @@ static void *status_thread(void *arg) {
 	return NULL;
 }
 
-static void player_joy_axis(struct player *plyr, struct js_event *ev) {
-	if (0 == ev->number)
-		mongrid_set_pan(ev->value);
-	else if (1 == ev->number)
-		mongrid_set_tilt(-ev->value);
-	else if (2 == ev->number)
-		mongrid_set_zoom(ev->value);
-}
-
-static void player_joy_event(struct player *plyr, struct js_event *ev) {
-	if (ev->type & JS_EVENT_INIT)
-		return;
-	if (ev->type & JS_EVENT_AXIS)
-		player_joy_axis(plyr, ev);
-}
-
 static void *joy_thread(void *arg) {
 	struct player *plyr = arg;
-	struct js_event ev;
 
-	while (true) {
-		int n_bytes = read(plyr->joy_fd, &ev, sizeof(ev));
-		if (n_bytes < 0) {
-			elog_err("joystick read: %s\n", strerror(errno));
-			break;
-		}
-		if (n_bytes == sizeof(ev))
-			player_joy_event(plyr, &ev);
+	while (mongrid_joy_event(plyr->joy_fd)) {
+		// keep going
 	}
 	return NULL;
 }
