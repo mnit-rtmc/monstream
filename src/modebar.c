@@ -37,6 +37,17 @@ struct modecell {
 #define MODECELL_PRESET	4
 #define MODECELL_LAST	5
 
+enum btn_req {
+	REQ_NONE,
+	REQ_PREV,
+	REQ_NEXT,
+	REQ_IRIS_OPEN,
+	REQ_IRIS_CLOSE,
+	REQ_FOCUS_NEAR,
+	REQ_FOCUS_FAR,
+	REQ_WIPER,
+};
+
 struct modebar {
 	struct lock	*lock;
 	pthread_t	tid;
@@ -50,8 +61,7 @@ struct modebar {
 	char            cam_req[6];
 	char            seq_req[6];
 	char            preset_req[6];
-	bool		prev_req;
-	bool		next_req;
+	enum btn_req    btn_req;
 	bool		ptz;
 	int16_t		pan;
 	int16_t		tilt;
@@ -214,13 +224,8 @@ static void modebar_set_cam(struct modebar *mbar) {
 	modebar_clear_entry(mbar);
 }
 
-static void modebar_set_prev(struct modebar *mbar) {
-	mbar->prev_req = true;
-	pthread_kill(mbar->tid, SIGUSR1);
-}
-
-static void modebar_set_next(struct modebar *mbar) {
-	mbar->next_req = true;
+static void modebar_set_req(struct modebar *mbar, enum btn_req req) {
+	mbar->btn_req = req;
 	pthread_kill(mbar->tid, SIGUSR1);
 }
 
@@ -257,9 +262,9 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 	else if ('\n' == k)
 		modebar_set_cam(mbar);
 	else if ('-' == k)
-		modebar_set_prev(mbar);
+		modebar_set_req(mbar, REQ_PREV);
 	else if ('+' == k)
-		modebar_set_next(mbar);
+		modebar_set_req(mbar, REQ_NEXT);
 	else if ('*' == k)
 		modebar_set_seq(mbar);
 	else if ('/' == k)
@@ -385,11 +390,26 @@ static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
 	if (ev->value) {
 		// FIXME: CH Products ID: 068e:00ca
 		switch (ev->number) {
+		case 0:
+			modebar_set_req(mbar, REQ_IRIS_OPEN);
+			break;
+		case 1:
+			modebar_set_req(mbar, REQ_IRIS_CLOSE);
+			break;
+		case 2:
+			modebar_set_req(mbar, REQ_FOCUS_NEAR);
+			break;
+		case 3:
+			modebar_set_req(mbar, REQ_FOCUS_FAR);
+			break;
+		case 4:
+			modebar_set_req(mbar, REQ_WIPER);
+			break;
 		case 10:
-			modebar_set_prev(mbar);
+			modebar_set_req(mbar, REQ_PREV);
 			break;
 		case 11:
-			modebar_set_next(mbar);
+			modebar_set_req(mbar, REQ_NEXT);
 			break;
 		default:
 			break;
@@ -424,7 +444,7 @@ static nstr_t modebar_prev(struct modebar *mbar, nstr_t str) {
 	snprintf(buf, sizeof(buf), "previous%c%s%c", UNIT_SEP, mbar->mon,
 		RECORD_SEP);
 	nstr_cat_z(&str, buf);
-	mbar->prev_req = false;
+	mbar->btn_req = REQ_NONE;
 	return str;
 }
 
@@ -433,8 +453,41 @@ static nstr_t modebar_next(struct modebar *mbar, nstr_t str) {
 	snprintf(buf, sizeof(buf), "next%c%s%c", UNIT_SEP, mbar->mon,
 		RECORD_SEP);
 	nstr_cat_z(&str, buf);
-	mbar->next_req = false;
+	mbar->btn_req = REQ_NONE;
 	return str;
+}
+
+static nstr_t modebar_lens(struct modebar *mbar, nstr_t str, const char *cmd) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "lens%c%s%c%s%c%s%c",
+		UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->cam,
+		UNIT_SEP, cmd,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	mbar->btn_req = REQ_NONE;
+	return str;
+}
+
+static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
+	switch (mbar->btn_req) {
+	case REQ_PREV:
+		return modebar_prev(mbar, str);
+	case REQ_NEXT:
+		return modebar_next(mbar, str);
+	case REQ_IRIS_OPEN:
+		return modebar_lens(mbar, str, "iris_open");
+	case REQ_IRIS_CLOSE:
+		return modebar_lens(mbar, str, "iris_close");
+	case REQ_FOCUS_NEAR:
+		return modebar_lens(mbar, str, "focus_near");
+	case REQ_FOCUS_FAR:
+		return modebar_lens(mbar, str, "focus_far");
+	case REQ_WIPER:
+		return modebar_lens(mbar, str, "wiper");
+	default:
+		return str;
+	}
 }
 
 static nstr_t modebar_sequence(struct modebar *mbar, nstr_t str) {
@@ -489,10 +542,8 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
 	if (modebar_has_mon(mbar)) {
 		if (strlen(mbar->cam_req))
 			return modebar_switch(mbar, str);
-		else if (mbar->prev_req)
-			return modebar_prev(mbar, str);
-		else if (mbar->next_req)
-			return modebar_next(mbar, str);
+		else if (mbar->btn_req != REQ_NONE)
+			return modebar_button(mbar, str);
 		else if (strlen(mbar->seq_req))
 			return modebar_sequence(mbar, str);
 		else if (strlen(mbar->preset_req))
