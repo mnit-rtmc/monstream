@@ -41,8 +41,10 @@ enum btn_req {
 	REQ_NONE,
 	REQ_PREV,
 	REQ_NEXT,
+	REQ_IRIS_STOP,
 	REQ_IRIS_OPEN,
 	REQ_IRIS_CLOSE,
+	REQ_FOCUS_STOP,
 	REQ_FOCUS_NEAR,
 	REQ_FOCUS_FAR,
 	REQ_WIPER,
@@ -386,35 +388,56 @@ static void modebar_joy_axis(struct modebar *mbar, struct js_event *ev) {
 		modebar_set_zoom(mbar, ev->value);
 }
 
-static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
-	if (ev->value) {
-		// FIXME: CH Products ID: 068e:00ca
-		switch (ev->number) {
-		case 0:
-			modebar_set_req(mbar, REQ_IRIS_OPEN);
-			break;
-		case 1:
-			modebar_set_req(mbar, REQ_IRIS_CLOSE);
-			break;
-		case 2:
-			modebar_set_req(mbar, REQ_FOCUS_NEAR);
-			break;
-		case 3:
-			modebar_set_req(mbar, REQ_FOCUS_FAR);
-			break;
-		case 4:
-			modebar_set_req(mbar, REQ_WIPER);
-			break;
-		case 10:
-			modebar_set_req(mbar, REQ_PREV);
-			break;
-		case 11:
-			modebar_set_req(mbar, REQ_NEXT);
-			break;
-		default:
-			break;
-		}
+static void modebar_joy_button_press(struct modebar *mbar, int number) {
+	// FIXME: CH Products ID: 068e:00ca
+	switch (number) {
+	case 0:
+		modebar_set_req(mbar, REQ_IRIS_OPEN);
+		break;
+	case 1:
+		modebar_set_req(mbar, REQ_IRIS_CLOSE);
+		break;
+	case 2:
+		modebar_set_req(mbar, REQ_FOCUS_NEAR);
+		break;
+	case 3:
+		modebar_set_req(mbar, REQ_FOCUS_FAR);
+		break;
+	case 4:
+		modebar_set_req(mbar, REQ_WIPER);
+		break;
+	case 10:
+		modebar_set_req(mbar, REQ_PREV);
+		break;
+	case 11:
+		modebar_set_req(mbar, REQ_NEXT);
+		break;
+	default:
+		break;
 	}
+}
+
+static void modebar_joy_button_release(struct modebar *mbar, int number) {
+	// FIXME: CH Products ID: 068e:00ca
+	switch (number) {
+	case 0:
+	case 1:
+		modebar_set_req(mbar, REQ_IRIS_STOP);
+		break;
+	case 2:
+	case 3:
+		modebar_set_req(mbar, REQ_FOCUS_STOP);
+		break;
+	default:
+		break;
+	}
+}
+
+static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
+	if (ev->value)
+		modebar_joy_button_press(mbar, ev->number);
+	else
+		modebar_joy_button_release(mbar, ev->number);
 }
 
 void modebar_joy_event(struct modebar *mbar, struct js_event *ev) {
@@ -475,10 +498,14 @@ static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
 		return modebar_prev(mbar, str);
 	case REQ_NEXT:
 		return modebar_next(mbar, str);
+	case REQ_IRIS_STOP:
+		return modebar_lens(mbar, str, "iris_stop");
 	case REQ_IRIS_OPEN:
 		return modebar_lens(mbar, str, "iris_open");
 	case REQ_IRIS_CLOSE:
 		return modebar_lens(mbar, str, "iris_close");
+	case REQ_FOCUS_STOP:
+		return modebar_lens(mbar, str, "focus_stop");
 	case REQ_FOCUS_NEAR:
 		return modebar_lens(mbar, str, "focus_near");
 	case REQ_FOCUS_FAR:

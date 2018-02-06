@@ -99,7 +99,7 @@ For held values, must be sent every second or will timeout.
 1. lens
 2. Monitor ID
 3. Camera ID
-4. iris_open / iris_close / focus_near / focus_far / wiper
+4. iris_open / iris_close / iris_stop / focus_near / focus_far / focus_stop / wiper
 
 ### Preset
 
