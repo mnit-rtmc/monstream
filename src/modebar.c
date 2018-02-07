@@ -202,9 +202,17 @@ static char get_key_char(const GdkEventKey *key) {
 	case GDK_KEY_Return:
 	case GDK_KEY_KP_Enter:
 		return '\n';
+	case GDK_KEY_BackSpace:
+		return 8; // ^h
 	default:
 		return 0;
 	}
+}
+
+static void modebar_backspace(struct modebar *mbar) {
+	int l = strlen(mbar->entry);
+	if (l > 0)
+		mbar->entry[l - 1] = 0;
 }
 
 static void modebar_clear_entry(struct modebar *mbar) {
@@ -271,6 +279,8 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		modebar_set_seq(mbar);
 	else if ('/' == k)
 		modebar_set_preset(mbar);
+	else if (8 == k)
+		modebar_backspace(mbar);
 	modebar_set_text(mbar);
 }
 
