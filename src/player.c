@@ -34,7 +34,6 @@
 struct player {
 	struct cxn *cxn;
 	const char *port;
-	int        joy_fd;
 	pthread_t  cmd_tid;
 	pthread_t  stat_tid;
 	pthread_t  joy_tid;
@@ -174,34 +173,47 @@ static void player_send_status(struct player *plyr) {
 	cxn_send(plyr->cxn, str);
 }
 
+static void sleep_for(time_t sec, long nano) {
+	struct timespec ts;
+	ts.tv_sec = sec;
+	ts.tv_nsec = nano;
+	nanosleep(&ts, NULL);
+}
+
 static void *status_thread(void *arg) {
 	struct player *plyr = arg;
-	struct timespec ts;
 
 	while (true) {
 		if (cxn_established(plyr->cxn)) {
 			player_send_status(plyr);
-			if (mongrid_mon_selected()) {
-				ts.tv_sec = 0;
-				ts.tv_nsec = 333333333;
-			} else {
-				ts.tv_sec = 1;
-				ts.tv_nsec = 0;
-			}
-		} else {
-			ts.tv_sec = 2;
-			ts.tv_nsec = 0;
-		}
-		nanosleep(&ts, NULL);
+			if (mongrid_mon_selected())
+				sleep_for(0, 333333333);
+			else
+				sleep_for(1, 0);
+		} else
+			sleep_for(2, 0);
 	}
 	return NULL;
 }
 
-static void *joy_thread(void *arg) {
-	struct player *plyr = arg;
+const char *JOY_PATH = "/dev/input/js0";
 
-	while (mongrid_joy_event(plyr->joy_fd)) {
-		// keep going
+static void process_joystick(void) {
+	int fd = open(JOY_PATH, O_RDONLY | O_NOFOLLOW, 0);
+	if (fd > 0) {
+		while (mongrid_joy_event(fd)) {
+			// keep going
+		}
+		if (close(fd) < 0)
+			elog_err("Close %s: %s\n", JOY_PATH, strerror(errno));
+	} else if (errno != ENOENT)
+		elog_err("Open %s: %s\n", JOY_PATH, strerror(errno));
+}
+
+static void *joy_thread(void *arg) {
+	while (true) {
+		process_joystick();
+		sleep_for(1, 0);
 	}
 	return NULL;
 }
@@ -252,13 +264,6 @@ static void player_load_cmds(struct player *plyr, uint32_t mon) {
 	}
 }
 
-static void player_open_joystick(struct player *plyr) {
-	const char *path = "/dev/input/js0";
-	plyr->joy_fd = open(path, O_RDONLY | O_NOFOLLOW, 0);
-	if (plyr->joy_fd < 0)
-		elog_err("Open %s: %s\n", path, strerror(errno));
-}
-
 static void player_sig_handler(int n_sig) {
 	// just ignore
 }
@@ -277,12 +282,10 @@ void run_player(bool gui, bool stats, const char *port) {
 	plyr.port = port;
 	config_init();
 	plyr.cxn = cxn_create();
-	player_open_joystick(&plyr);
-	mongrid_create(gui, stats, plyr.joy_fd > 0);
+	mongrid_create(gui, stats, true);
 	plyr.cmd_tid = player_create_thread(&plyr, cmd_thread);
 	plyr.stat_tid = player_create_thread(&plyr, status_thread);
-	if (plyr.joy_fd > 0)
-		plyr.joy_tid = player_create_thread(&plyr, joy_thread);
+	plyr.joy_tid = player_create_thread(&plyr, joy_thread);
 	player_install_handler(&plyr);
 	while (plyr.cmd_tid && plyr.stat_tid) {
 		uint32_t mon = load_config();
