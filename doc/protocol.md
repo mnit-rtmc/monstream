@@ -114,4 +114,4 @@ For held values, must be sent every second or will timeout.
 1. menu
 2. Monitor ID
 3. Camera ID
-4. enter / cancel
+4. open / enter / cancel

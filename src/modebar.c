@@ -48,6 +48,7 @@ enum btn_req {
 	REQ_FOCUS_NEAR,
 	REQ_FOCUS_FAR,
 	REQ_WIPER,
+	REQ_OPEN,
 	REQ_ENTER,
 	REQ_CANCEL,
 };
@@ -461,10 +462,13 @@ static void modebar_joy_button_press(struct modebar *mbar, int number) {
 	case 4:
 		modebar_set_req(mbar, REQ_WIPER);
 		break;
-	case 8:
+	case 5:
+		modebar_set_req(mbar, REQ_OPEN);
+		break;
+	case 6:
 		modebar_set_req(mbar, REQ_ENTER);
 		break;
-	case 9:
+	case 7:
 		modebar_set_req(mbar, REQ_CANCEL);
 		break;
 	case 10:
@@ -592,6 +596,8 @@ static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
 		return modebar_lens(mbar, str, "focus_far");
 	case REQ_WIPER:
 		return modebar_lens(mbar, str, "wiper");
+	case REQ_OPEN:
+		return modebar_menu(mbar, str, "open");
 	case REQ_ENTER:
 		return modebar_menu(mbar, str, "enter");
 	case REQ_CANCEL:
