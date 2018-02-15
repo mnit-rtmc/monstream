@@ -588,3 +588,8 @@ bool mongrid_joy_event(int fd) {
 	} else
 		return false;
 }
+
+void mongrid_set_online(bool online) {
+	if (grid.mbar)
+		modebar_set_online(grid.mbar, online);
+}

@@ -17,5 +17,6 @@ bool mongrid_mon_selected(void);
 nstr_t mongrid_status(nstr_t str);
 void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq);
 bool mongrid_joy_event(int fd);
+void mongrid_set_online(bool online);
 
 #endif

@@ -15,5 +15,6 @@ nstr_t modebar_status(struct modebar *mbar, nstr_t str);
 void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq);
 void modebar_set_tid(struct modebar *mbar, pthread_t tid);
 void modebar_joy_event(struct modebar *mbar, struct js_event *ev);
+void modebar_set_online(struct modebar *mbar, bool online);
 
 #endif

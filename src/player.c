@@ -184,7 +184,9 @@ static void *status_thread(void *arg) {
 	struct player *plyr = arg;
 
 	while (true) {
-		if (cxn_established(plyr->cxn)) {
+		bool online = cxn_established(plyr->cxn);
+		mongrid_set_online(online);
+		if (online) {
 			player_send_status(plyr);
 			if (mongrid_mon_selected())
 				sleep_for(0, 333333333);

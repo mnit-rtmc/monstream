@@ -70,6 +70,9 @@ struct modebar {
 	int16_t		pan;
 	int16_t		tilt;
 	int16_t		zoom;
+	int32_t		accent;
+	uint32_t	font_sz;
+	bool		online;
 	bool		visible;
 };
 
@@ -327,6 +330,8 @@ struct modebar *modebar_create(GtkWidget *window, struct lock *lock) {
 	memset(mbar, 0, sizeof(struct modebar));
 	mbar->lock = lock;
 	mbar->css_provider = gtk_css_provider_new();
+	mbar->accent = 0;
+	mbar->font_sz = 32;
 	mbar->box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 	gtk_box_set_homogeneous(GTK_BOX(mbar->box), TRUE);
 	modebar_add_cell(mbar, MODECELL_MON, "mon_lbl", ".");
@@ -378,16 +383,23 @@ static const char MODEBAR_CSS[] =
 		"font-weight: Bold; "
 	"}\n";
 
-void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
+static void modebar_update_accent(struct modebar *mbar) {
 	char css[sizeof(MODEBAR_CSS) + 16];
 	GError *err = NULL;
-	int32_t a0 = (accent > 0) ? accent : ACCENT_GRAY;
+	int32_t a0 = (mbar->online) ? mbar->accent : ACCENT_GRAY;
 	int32_t a1 = (a0 >> 1) & 0x7F7F7F; // divide rgb by 2
 
-	snprintf(css, sizeof(css), MODEBAR_CSS, font_sz, a1, a1, COLOR_MON, a0);
+	snprintf(css, sizeof(css), MODEBAR_CSS, mbar->font_sz, a1, a1,
+		COLOR_MON, a0);
 	gtk_css_provider_load_from_data(mbar->css_provider, css, -1, &err);
 	if (err != NULL)
 		elog_err("CSS error: %s\n", err->message);
+}
+
+void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz){
+	mbar->accent = accent;
+	mbar->font_sz = font_sz;
+	modebar_update_accent(mbar);
 }
 
 #define PTZ_THRESH 8192
@@ -668,4 +680,9 @@ void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
 	nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
 	nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
 	g_timeout_add(0, do_modebar_set_text, mbar);
+}
+
+void modebar_set_online(struct modebar *mbar, bool online) {
+	mbar->online = online;
+	modebar_update_accent(mbar);
 }
