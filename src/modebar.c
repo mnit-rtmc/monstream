@@ -54,7 +54,7 @@ enum btn_req {
 
 struct modebar {
 	struct lock	*lock;
-	pthread_t	tid;
+	pthread_t	tid; // status thread ID
 	GtkWidget	*box;
 	GtkCssProvider	*css_provider;
 	struct modecell cells[MODECELL_LAST];
@@ -245,24 +245,30 @@ static void modebar_set_mon(struct modebar *mbar) {
 	modebar_clear_entry(mbar);
 }
 
+static void modebar_wake_status(struct modebar *mbar) {
+	int rc = pthread_kill(mbar->tid, SIGUSR1);
+	if (rc)
+		elog_err("pthread_kill: %s\n", strerror(rc));
+}
+
 static void modebar_set_cam(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && mbar->tid) {
 		strncpy(mbar->cam_req, mbar->entry, sizeof(mbar->cam_req));
-		pthread_kill(mbar->tid, SIGUSR1);
+		modebar_wake_status(mbar);
 	}
 	modebar_clear_entry(mbar);
 }
 
 static void modebar_set_req(struct modebar *mbar, enum btn_req req) {
 	mbar->btn_req = req;
-	pthread_kill(mbar->tid, SIGUSR1);
+	modebar_wake_status(mbar);
 }
 
 static void modebar_set_seq(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && mbar->tid) {
 		const char *e = (strlen(mbar->entry)) ? mbar->entry : "pause";
 		strncpy(mbar->seq_req, e, sizeof(mbar->seq_req));
-		pthread_kill(mbar->tid, SIGUSR1);
+		modebar_wake_status(mbar);
 	}
 	modebar_clear_entry(mbar);
 }
@@ -270,7 +276,7 @@ static void modebar_set_seq(struct modebar *mbar) {
 static void modebar_set_preset(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && modebar_has_cam(mbar) && mbar->tid) {
 		strncpy(mbar->preset_req, mbar->entry,sizeof(mbar->preset_req));
-		pthread_kill(mbar->tid, SIGUSR1);
+		modebar_wake_status(mbar);
 	}
 	modebar_clear_entry(mbar);
 }
@@ -392,7 +398,7 @@ static void modebar_set_pan(struct modebar *mbar, int16_t pan) {
 	if (pan) {
 		mbar->ptz = true;
 		if (abs(p - (int) pan) > PTZ_THRESH)
-			pthread_kill(mbar->tid, SIGUSR1);
+			modebar_wake_status(mbar);
 	}
 }
 
@@ -402,7 +408,7 @@ static void modebar_set_tilt(struct modebar *mbar, int16_t tilt) {
 	if (tilt) {
 		mbar->ptz = true;
 		if (abs(t - (int) tilt) > PTZ_THRESH)
-			pthread_kill(mbar->tid, SIGUSR1);
+			modebar_wake_status(mbar);
 	}
 }
 
@@ -412,7 +418,7 @@ static void modebar_set_zoom(struct modebar *mbar, int16_t zoom) {
 	if (zoom) {
 		mbar->ptz = true;
 		if ((z > 0 && zoom <= 0) || (z < 0 && zoom >= 0))
-			pthread_kill(mbar->tid, SIGUSR1);
+			modebar_wake_status(mbar);
 	}
 }
 
