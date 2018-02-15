@@ -108,3 +108,10 @@ For held values, must be sent every second or will timeout.
 3. Camera ID
 4. recall / store
 5. Preset #
+
+### Menu
+
+1. menu
+2. Monitor ID
+3. Camera ID
+4. enter / cancel

@@ -48,6 +48,8 @@ enum btn_req {
 	REQ_FOCUS_NEAR,
 	REQ_FOCUS_FAR,
 	REQ_WIPER,
+	REQ_ENTER,
+	REQ_CANCEL,
 };
 
 struct modebar {
@@ -429,6 +431,12 @@ static void modebar_joy_button_press(struct modebar *mbar, int number) {
 	case 4:
 		modebar_set_req(mbar, REQ_WIPER);
 		break;
+	case 8:
+		modebar_set_req(mbar, REQ_ENTER);
+		break;
+	case 9:
+		modebar_set_req(mbar, REQ_CANCEL);
+		break;
 	case 10:
 		modebar_set_req(mbar, REQ_PREV);
 		break;
@@ -522,6 +530,18 @@ static nstr_t modebar_lens(struct modebar *mbar, nstr_t str, const char *cmd) {
 	return str;
 }
 
+static nstr_t modebar_menu(struct modebar *mbar, nstr_t str, const char *cmd) {
+	char buf[64];
+	snprintf(buf, sizeof(buf), "menu%c%s%c%s%c%s%c",
+		UNIT_SEP, mbar->mon,
+		UNIT_SEP, mbar->cam,
+		UNIT_SEP, cmd,
+		RECORD_SEP);
+	nstr_cat_z(&str, buf);
+	mbar->btn_req = REQ_NONE;
+	return str;
+}
+
 static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
 	switch (mbar->btn_req) {
 	case REQ_PREV:
@@ -542,6 +562,10 @@ static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
 		return modebar_lens(mbar, str, "focus_far");
 	case REQ_WIPER:
 		return modebar_lens(mbar, str, "wiper");
+	case REQ_ENTER:
+		return modebar_menu(mbar, str, "enter");
+	case REQ_CANCEL:
+		return modebar_menu(mbar, str, "cancel");
 	default:
 		return str;
 	}
