@@ -433,6 +433,7 @@ static void mongrid_init_gtk(uint32_t n_cells) {
 	}
 	gtk_box_pack_end(GTK_BOX(grid.tbox), GTK_WIDGET(grid.grid),TRUE,TRUE,0);
 	gtk_widget_show_all(grid.window);
+	modebar_hide(grid.mbar);
 	gtk_widget_realize(grid.window);
 	mongrid_set_handles();
 }
@@ -562,10 +563,11 @@ bool mongrid_mon_selected(void) {
 }
 
 void mongrid_display(nstr_t mon, nstr_t cam, nstr_t seq) {
-	lock_acquire(&grid.lock, __func__);
-	if (grid.mbar)
+	if (grid.mbar) {
+		lock_acquire(&grid.lock, __func__);
 		modebar_display(grid.mbar, mon, cam, seq);
-	lock_release(&grid.lock, __func__);
+		lock_release(&grid.lock, __func__);
+	}
 }
 
 bool mongrid_joy_event(int fd) {
@@ -574,6 +576,7 @@ bool mongrid_joy_event(int fd) {
 		int n_bytes = read(fd, &ev, sizeof(ev));
 		if (n_bytes < 0) {
 			elog_err("joystick read: %s\n", strerror(errno));
+			modebar_hide(grid.mbar);
 			return false;
 		}
 		if (n_bytes == sizeof(ev)) {

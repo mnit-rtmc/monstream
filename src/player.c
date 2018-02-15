@@ -287,7 +287,7 @@ void run_player(bool gui, bool stats, const char *port) {
 	plyr.stat_tid = player_create_thread(&plyr, status_thread);
 	plyr.joy_tid = player_create_thread(&plyr, joy_thread);
 	player_install_handler(&plyr);
-	while (plyr.cmd_tid && plyr.stat_tid) {
+	while (plyr.cmd_tid && plyr.stat_tid && plyr.joy_tid) {
 		uint32_t mon = load_config();
 		if (mongrid_init(mon, plyr.stat_tid))
 			break;

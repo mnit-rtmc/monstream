@@ -70,6 +70,7 @@ struct modebar {
 	int16_t		pan;
 	int16_t		tilt;
 	int16_t		zoom;
+	bool		visible;
 };
 
 static GtkWidget *create_label(GtkCssProvider *css_provider, const char *name,
@@ -211,22 +212,30 @@ static char get_key_char(const GdkEventKey *key) {
 	}
 }
 
-static void modebar_backspace(struct modebar *mbar) {
-	int l = strlen(mbar->entry);
-	if (l > 0)
-		mbar->entry[l - 1] = 0;
+static bool modebar_is_visible(const struct modebar *mbar) {
+	return mbar->visible;
 }
 
-static void modebar_hide(struct modebar *mbar) {
+void modebar_hide(struct modebar *mbar) {
+	mbar->visible = false;
 	gtk_widget_hide(mbar->box);
 }
 
 static void modebar_show(struct modebar *mbar) {
+	mbar->visible = true;
 	gtk_widget_show_all(mbar->box);
+}
+
+static void modebar_backspace(struct modebar *mbar) {
+	int l = strlen(mbar->entry);
+	if (l > 0)
+		mbar->entry[l - 1] = 0;
+	modebar_show(mbar);
 }
 
 static void modebar_clear_entry(struct modebar *mbar) {
 	memset(mbar->entry, 0, sizeof(mbar->entry));
+	modebar_show(mbar);
 }
 
 static void modebar_set_mon(struct modebar *mbar) {
@@ -276,16 +285,19 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 			mbar->entry[len] = k;
 			mbar->entry[len + 1] = 0;
 		}
+		modebar_show(mbar);
 	}
 	else if ('.' == k)
 		modebar_set_mon(mbar);
 	else if ('\n' == k)
 		modebar_set_cam(mbar);
-	else if ('-' == k)
+	else if ('-' == k) {
 		modebar_set_req(mbar, REQ_PREV);
-	else if ('+' == k)
+		modebar_show(mbar);
+	} else if ('+' == k) {
 		modebar_set_req(mbar, REQ_NEXT);
-	else if ('*' == k)
+		modebar_show(mbar);
+	} else if ('*' == k)
 		modebar_set_seq(mbar);
 	else if ('/' == k)
 		modebar_set_preset(mbar);
@@ -295,7 +307,6 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		modebar_hide(mbar);
 		return;
 	}
-	modebar_show(mbar);
 	modebar_set_text(mbar);
 }
 
@@ -322,6 +333,7 @@ struct modebar *modebar_create(GtkWidget *window, struct lock *lock) {
 		G_CALLBACK(key_press), mbar);
 	modebar_set_mon(mbar);
 	modebar_set_text(mbar);
+	modebar_hide(mbar);
 	return mbar;
 }
 
@@ -620,7 +632,7 @@ static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
 }
 
 nstr_t modebar_status(struct modebar *mbar, nstr_t str) {
-	if (modebar_has_mon(mbar)) {
+	if (modebar_is_visible(mbar) && modebar_has_mon(mbar)) {
 		if (strlen(mbar->cam_req))
 			return modebar_switch(mbar, str);
 		else if (mbar->btn_req != REQ_NONE)
