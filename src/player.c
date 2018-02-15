@@ -282,7 +282,7 @@ void run_player(bool gui, bool stats, const char *port) {
 	plyr.port = port;
 	config_init();
 	plyr.cxn = cxn_create();
-	mongrid_create(gui, stats, true);
+	mongrid_create(gui, stats);
 	plyr.cmd_tid = player_create_thread(&plyr, cmd_thread);
 	plyr.stat_tid = player_create_thread(&plyr, status_thread);
 	plyr.joy_tid = player_create_thread(&plyr, joy_thread);

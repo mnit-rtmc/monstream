@@ -156,7 +156,7 @@ static gboolean do_update_title(gpointer data) {
 	if (is_moncell_valid(mc)) {
 		moncell_update_accent_title(mc);
 		/* only update modebar if this is the first monitor */
-		if (grid.mbar && (mc == grid.cells))
+		if (mc == grid.cells)
 			modebar_set_accent(grid.mbar, mc->accent, mc->font_sz);
 	}
 	lock_release(&grid.lock, __func__);
@@ -392,7 +392,7 @@ static gboolean do_stats(gpointer data) {
 	return TRUE;
 }
 
-void mongrid_create(bool gui, bool stats, bool modebar) {
+void mongrid_create(bool gui, bool stats) {
 	gst_init(NULL, NULL);
 	memset(&grid, 0, sizeof(struct mongrid));
 	lock_init(&grid.lock);
@@ -403,11 +403,9 @@ void mongrid_create(bool gui, bool stats, bool modebar) {
 		grid.window = window;
 		grid.tbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 		g_object_set(G_OBJECT(grid.tbox), "spacing", 4, NULL);
-		if (modebar) {
-			grid.mbar = modebar_create(grid.window, &grid.lock);
-			gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
-				grid.mbar), FALSE, FALSE, 0);
-		}
+		grid.mbar = modebar_create(grid.window, &grid.lock);
+		gtk_box_pack_start(GTK_BOX(grid.tbox), modebar_get_box(
+			grid.mbar), FALSE, FALSE, 0);
 		gtk_container_add(GTK_CONTAINER(grid.window), grid.tbox);
 		gtk_window_set_title((GtkWindow *) window, "MonStream");
 		gtk_window_fullscreen((GtkWindow *) window);
@@ -452,8 +450,7 @@ int32_t mongrid_init(uint32_t num, pthread_t tid) {
 		moncell_init(grid.cells + n, n);
 	if (grid.window) {
 		mongrid_init_gtk(grid.n_cells);
-		if (grid.mbar)
-			modebar_set_tid(grid.mbar, tid);
+		modebar_set_tid(grid.mbar, tid);
 	}
 	grid.running = false;
 	lock_release(&grid.lock, __func__);

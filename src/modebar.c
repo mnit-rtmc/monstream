@@ -215,6 +215,14 @@ static void modebar_backspace(struct modebar *mbar) {
 		mbar->entry[l - 1] = 0;
 }
 
+static void modebar_hide(struct modebar *mbar) {
+	gtk_widget_hide(mbar->box);
+}
+
+static void modebar_show(struct modebar *mbar) {
+	gtk_widget_show_all(mbar->box);
+}
+
 static void modebar_clear_entry(struct modebar *mbar) {
 	memset(mbar->entry, 0, sizeof(mbar->entry));
 }
@@ -281,6 +289,11 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		modebar_set_preset(mbar);
 	else if (8 == k)
 		modebar_backspace(mbar);
+	else if ('\t' == k) {
+		modebar_hide(mbar);
+		return;
+	}
+	modebar_show(mbar);
 	modebar_set_text(mbar);
 }
 
@@ -450,7 +463,14 @@ static void modebar_joy_button(struct modebar *mbar, struct js_event *ev) {
 		modebar_joy_button_release(mbar, ev->number);
 }
 
+static gboolean do_modebar_show(gpointer data) {
+	struct modebar *mbar = (struct modebar *) data;
+	modebar_show(mbar);
+	return FALSE;
+}
+
 void modebar_joy_event(struct modebar *mbar, struct js_event *ev) {
+	g_timeout_add(0, do_modebar_show, mbar);
 	if (ev->type & JS_EVENT_INIT)
 		return;
 	if (ev->type & JS_EVENT_AXIS)
