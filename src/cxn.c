@@ -147,6 +147,20 @@ void cxn_bind(struct cxn *cxn, const char *service) {
 	cxn_set_fd(cxn, fd);
 }
 
+static void cxn_disconnect(struct cxn *cxn, int fd) {
+	struct sockaddr_storage addr;
+
+	memset(&addr, 0, sizeof(struct sockaddr_storage));
+	addr.ss_family = AF_UNSPEC;
+	if (connect(fd, (const struct sockaddr *) &addr,
+		sizeof(struct sockaddr_storage)) == 0)
+	{
+		cxn_log(cxn, "disconnected");
+		cxn_set_addr(cxn, &addr, 0);
+	} else
+		elog_err("disconnect: %s\n", strerror(errno));
+}
+
 void cxn_send(struct cxn *cxn, nstr_t str) {
 	struct sockaddr_storage addr;
 	socklen_t               len;
@@ -160,6 +174,7 @@ void cxn_send(struct cxn *cxn, nstr_t str) {
 	if (n < 0) {
 		elog_err("Send socket: %s\n", strerror(errno));
 		cxn_log(cxn, "send error");
+		cxn_disconnect(cxn, fd);
 	}
 }
 
@@ -171,20 +186,6 @@ static void cxn_connect(struct cxn *cxn, int fd, struct sockaddr_storage *addr,
 		cxn_log(cxn, "connected");
 	} else
 		elog_err("connect: %s\n", strerror(errno));
-}
-
-static void cxn_disconnect(struct cxn *cxn, int fd) {
-	struct sockaddr_storage addr;
-
-	memset(&addr, 0, sizeof(struct sockaddr_storage));
-	addr.ss_family = AF_UNSPEC;
-	if (connect(fd, (const struct sockaddr *) &addr,
-		sizeof(struct sockaddr_storage)) == 0)
-	{
-		cxn_log(cxn, "disconnected");
-		cxn_set_addr(cxn, &addr, 0);
-	} else
-		elog_err("disconnect: %s\n", strerror(errno));
 }
 
 nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
