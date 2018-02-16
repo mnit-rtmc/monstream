@@ -34,6 +34,7 @@ struct moncell {
 	struct stream	stream;          /* must be first, due to casting */
 	char		mid[8];          /* monitor ID */
 	char		description[64]; /* location description */
+	char		extra[24];       /* extra monitors */
 	int32_t		accent;          /* accent color for title */
 	uint32_t	font_sz;
 	GtkCssProvider	*css_provider;
@@ -44,6 +45,7 @@ struct moncell {
 	GtkWidget	*stat_lbl;
 	GtkWidget	*cam_lbl;
 	GtkWidget	*desc_lbl;
+	GtkWidget	*ex_lbl;
 	gboolean	started;
 	gboolean        failed;
 	gboolean	clear;
@@ -129,7 +131,10 @@ static void moncell_update_title(struct moncell *mc) {
 		gtk_label_set_text(GTK_LABEL(mc->cam_lbl),
 			moncell_get_cam_id(mc));
 		gtk_label_set_text(GTK_LABEL(mc->desc_lbl), mc->description);
+		gtk_label_set_text(GTK_LABEL(mc->ex_lbl), mc->extra);
 		gtk_widget_show_all(mc->title);
+		if (0 == mc->extra[0])
+			gtk_widget_hide(mc->ex_lbl);
 	} else
 		gtk_widget_hide(mc->title);
 }
@@ -266,10 +271,12 @@ static void moncell_init_gtk(struct moncell *mc) {
 	mc->stat_lbl = create_label(mc->css_provider, "stat_lbl", 0);
 	mc->cam_lbl = create_label(mc->css_provider, "cam_lbl", 0);
 	mc->desc_lbl = create_label(mc->css_provider, "desc_lbl", 0);
+	mc->ex_lbl = create_label(mc->css_provider, "mon_lbl", 0);
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->mon_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->title), mc->stat_lbl, TRUE, TRUE, 0);
+	gtk_box_pack_end(GTK_BOX(mc->title), mc->ex_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->desc_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_end(GTK_BOX(mc->title), mc->cam_lbl, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(mc->box), mc->video, TRUE, TRUE, 0);
@@ -295,6 +302,7 @@ static void moncell_destroy(struct moncell *mc) {
 		gtk_widget_destroy(mc->stat_lbl);
 		gtk_widget_destroy(mc->cam_lbl);
 		gtk_widget_destroy(mc->desc_lbl);
+		gtk_widget_destroy(mc->ex_lbl);
 		gtk_widget_destroy(mc->video);
 		gtk_widget_destroy(mc->title);
 		gtk_widget_destroy(mc->box);
@@ -318,13 +326,14 @@ static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
 
 static void moncell_set_mon(struct moncell *mc, nstr_t mid, int32_t accent,
 	bool aspect, uint32_t font_sz, nstr_t crop, uint32_t hgap,
-	uint32_t vgap)
+	uint32_t vgap, nstr_t extra)
 {
 	nstr_wrap(mc->mid, sizeof(mc->mid), mid);
 	mc->accent = accent;
 	stream_set_aspect(&mc->stream, aspect);
 	stream_set_font_size(&mc->stream, font_sz);
 	stream_set_crop(&mc->stream, crop, hgap, vgap);
+	nstr_wrap(mc->extra, sizeof(mc->extra), extra);
 	mc->font_sz = font_sz;
 	if (grid.window)
 		g_timeout_add(0, do_update_title, mc);
@@ -503,13 +512,14 @@ void mongrid_reset(void) {
 }
 
 void mongrid_set_mon(uint32_t idx, nstr_t mid, int32_t accent, bool aspect,
-	uint32_t font_sz, nstr_t crop, uint32_t hgap, uint32_t vgap)
+	uint32_t font_sz, nstr_t crop, uint32_t hgap, uint32_t vgap,
+	nstr_t extra)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.n_cells) {
 		struct moncell *mc = grid.cells + idx;
 		moncell_set_mon(mc, mid, accent, aspect, font_sz, crop, hgap,
-			vgap);
+			vgap, extra);
 	}
 	lock_release(&grid.lock, __func__);
 }

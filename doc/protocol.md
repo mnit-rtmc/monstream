@@ -22,6 +22,7 @@ Messages are separated by ASCII record separator (30).
    Horizontal index, span, vertical index, span
 8. Horizontal gap (1 -> 0.01%)
 9. Vertical gap (20 -> 0.2%)
+10. Extra monitor label
 
 ### Play
 

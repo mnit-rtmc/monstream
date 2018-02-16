@@ -103,6 +103,7 @@ static void proc_monitor(nstr_t cmd, bool store) {
 	nstr_t crop    = nstr_split(&str, UNIT_SEP);    // crop code
 	nstr_t hg      = nstr_split(&str, UNIT_SEP);    // horizontal gap
 	nstr_t vg      = nstr_split(&str, UNIT_SEP);    // vertical gap
+	nstr_t extra   = nstr_split(&str, UNIT_SEP);    // extra mon
 	assert(nstr_cmp_z(monitor, "monitor"));
 	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
@@ -113,7 +114,7 @@ static void proc_monitor(nstr_t cmd, bool store) {
 		uint32_t vgap = nstr_parse_u32(vg);
 		elog_cmd(cmd);
 		mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop, hgap,
-			vgap);
+			vgap, extra);
 		if (store) {
 			char fname[16];
 			sprintf(fname, "monitor.%d", mon);
