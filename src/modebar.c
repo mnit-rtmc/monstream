@@ -216,7 +216,7 @@ static char get_key_char(const GdkEventKey *key) {
 	}
 }
 
-static bool modebar_is_visible(const struct modebar *mbar) {
+bool modebar_is_visible(const struct modebar *mbar) {
 	return mbar->visible;
 }
 

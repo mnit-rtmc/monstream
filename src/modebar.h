@@ -8,6 +8,7 @@
 
 struct modebar *modebar_create(GtkWidget *window, struct lock *lock);
 GtkWidget *modebar_get_box(struct modebar *mbar);
+bool modebar_is_visible(const struct modebar *mbar);
 void modebar_hide(struct modebar *mbar);
 void modebar_set_accent(struct modebar *mbar, int32_t accent, uint32_t font_sz);
 bool modebar_has_mon(const struct modebar *mbar);
