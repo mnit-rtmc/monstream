@@ -242,11 +242,17 @@ static void modebar_clear_entry(struct modebar *mbar) {
 	modebar_show(mbar);
 }
 
+static bool modebar_has_entry(const struct modebar *mbar) {
+	return mbar->entry[0];
+}
+
 static void modebar_set_mon(struct modebar *mbar) {
-	strncpy(mbar->mon, mbar->entry, sizeof(mbar->mon));
-	memset(mbar->cam, 0, sizeof(mbar->cam));
-	memset(mbar->seq, 0, sizeof(mbar->seq));
-	modebar_clear_entry(mbar);
+	if (modebar_has_entry(mbar)) {
+		strncpy(mbar->mon, mbar->entry, sizeof(mbar->mon));
+		memset(mbar->cam, 0, sizeof(mbar->cam));
+		memset(mbar->seq, 0, sizeof(mbar->seq));
+		modebar_clear_entry(mbar);
+	}
 }
 
 static void modebar_wake_status(struct modebar *mbar) {
@@ -270,7 +276,7 @@ static void modebar_set_req(struct modebar *mbar, enum btn_req req) {
 
 static void modebar_set_seq(struct modebar *mbar) {
 	if (modebar_has_mon(mbar) && mbar->tid) {
-		const char *e = (strlen(mbar->entry)) ? mbar->entry : "pause";
+		const char *e = modebar_has_entry(mbar) ? mbar->entry : "pause";
 		strncpy(mbar->seq_req, e, sizeof(mbar->seq_req));
 		modebar_wake_status(mbar);
 	}
