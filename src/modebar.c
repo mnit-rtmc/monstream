@@ -688,7 +688,15 @@ void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
 	g_timeout_add(0, do_modebar_set_text, mbar);
 }
 
+static gboolean do_modebar_update_accent(gpointer data) {
+	struct modebar *mbar = data;
+	lock_acquire(mbar->lock, __func__);
+	modebar_update_accent(mbar);
+	lock_release(mbar->lock, __func__);
+	return FALSE;
+}
+
 void modebar_set_online(struct modebar *mbar, bool online) {
 	mbar->online = online;
-	modebar_update_accent(mbar);
+	g_timeout_add(0, do_modebar_update_accent, mbar);
 }

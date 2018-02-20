@@ -600,6 +600,9 @@ bool mongrid_joy_event(int fd) {
 }
 
 void mongrid_set_online(bool online) {
-	if (grid.mbar)
+	if (grid.mbar) {
+		lock_acquire(&grid.lock, __func__);
 		modebar_set_online(grid.mbar, online);
+		lock_release(&grid.lock, __func__);
+	}
 }
