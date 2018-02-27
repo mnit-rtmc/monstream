@@ -29,6 +29,7 @@ struct stream {
 	GstElement	*jitter;
 	GstElement	*sink;
 	GstClockTime	last_pts;
+	guint64		pushed;
 	guint64		lost;
 	guint64		late;
 	uint32_t	n_starts;

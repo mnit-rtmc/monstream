@@ -376,24 +376,32 @@ static void hide_cursor(GtkWidget *window) {
 	gdk_window_set_cursor(gtk_widget_get_window(window), cursor);
 }
 
-static void moncell_update_stats(struct moncell *mc, guint64 lost,
-	guint64 late)
+static void moncell_update_stats(struct moncell *mc, guint64 pushed,
+	guint64 lost, guint64 late)
 {
 	char buf[16];
-	snprintf(buf, sizeof(buf), "%" G_GUINT64_FORMAT ", %" G_GUINT64_FORMAT,
-		lost, late);
+	snprintf(buf, sizeof(buf), "%" G_GUINT64_FORMAT "  %" G_GUINT64_FORMAT
+	         "  %" G_GUINT64_FORMAT, pushed, lost, late);
 	gtk_label_set_text(GTK_LABEL(mc->stat_lbl), buf);
+}
+
+static guint64 pkt_count(guint64 t0, guint64 t1) {
+	return (t0 < t1) ? t1 - t0 : 0;
 }
 
 static gboolean do_stats(gpointer data) {
 	lock_acquire(&grid.lock, __func__);
 	for (uint32_t n = 0; n < grid.n_cells; n++) {
 		struct moncell *mc = grid.cells + n;
+		guint64 pushed = mc->stream.pushed;
+		guint64 lost = mc->stream.lost;
+		guint64 late = mc->stream.late;
 		if (stream_stats(&mc->stream)) {
 			if (grid.window) {
-				guint64 lost = mc->stream.lost;
-				guint64 late = mc->stream.late;
-				moncell_update_stats(mc, lost, late);
+				guint64 p = pkt_count(pushed,mc->stream.pushed);
+				guint64 ls = pkt_count(lost, mc->stream.lost);
+				guint64 lt = pkt_count(late, mc->stream.late);
+				moncell_update_stats(mc, p, ls, lt);
 			}
 		}
 	}

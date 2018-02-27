@@ -521,6 +521,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->jitter = NULL;
 	st->sink = NULL;
 	st->last_pts = 0;
+	st->pushed = 0;
 	st->lost = 0;
 	st->late = 0;
 	st->n_starts = 0;
@@ -602,12 +603,14 @@ static bool stream_jitter_stats(struct stream *st) {
 	GstStructure *s;
 	g_object_get(st->jitter, "stats", &s, NULL);
 	if (s) {
-		guint64 lost, late;
+		guint64 pushed, lost, late;
 		gboolean r =
-		        gst_structure_get_uint64(s, "num-lost", &lost)
+			gst_structure_get_uint64(s, "num-pushed", &pushed)
+		     && gst_structure_get_uint64(s, "num-lost", &lost)
 		     && gst_structure_get_uint64(s, "num-late", &late);
 		gst_structure_free(s);
 		if (r) {
+			st->pushed = pushed;
 			st->lost = lost;
 			st->late = late;
 			return true;
@@ -622,14 +625,23 @@ static bool stream_update_stats(struct stream *st) {
 	return (st->jitter) && stream_jitter_stats(st);
 }
 
+static guint64 pkt_count(guint64 t0, guint64 t1) {
+	return (t0 < t1) ? t1 - t0 : 0;
+}
+
 bool stream_stats(struct stream *st) {
+	guint64 pushed = st->pushed;
 	guint64 lost = st->lost;
 	guint64 late = st->late;
 	bool update = stream_update_stats(st);
-	if (update && (lost != st->lost || late != st->late)) {
-		elog_err("stats %s: %" G_GUINT64_FORMAT " lost, %"
-			G_GUINT64_FORMAT " late pkts\n", st->cam_id, st->lost,
-			st->late);
+	if (update) {
+		elog_err("stats %s: "
+			 "%" G_GUINT64_FORMAT " pushed, "
+			 "%" G_GUINT64_FORMAT " lost, "
+			 "%" G_GUINT64_FORMAT " late pkts\n", st->cam_id,
+		         pkt_count(pushed, st->pushed),
+		         pkt_count(lost, st->lost),
+		         pkt_count(late, st->late));
 		return true;
 	} else
 		return false;
