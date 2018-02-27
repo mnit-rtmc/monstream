@@ -27,6 +27,8 @@ struct stream {
 	GstBus		*bus;
 	GstElement	*elem[MAX_ELEMS];
 	GstElement	*jitter;
+	GstElement	*sink;
+	GstClockTime	last_pts;
 	guint64		lost;
 	guint64		late;
 	uint32_t	n_starts;

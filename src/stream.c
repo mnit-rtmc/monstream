@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2018  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,6 +80,7 @@ static GstElement* stream_create_xvimagesink(struct stream *st) {
 	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 	gst_video_overlay_set_window_handle(overlay, st->handle);
 	g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect, NULL);
+	st->sink = sink;
 	return sink;
 }
 
@@ -306,6 +307,7 @@ static void stream_remove_all(struct stream *st) {
 	}
 	memset(st->elem, 0, sizeof(st->elem));
 	st->jitter = NULL;
+	st->sink = NULL;
 }
 
 static void stream_stop_pipeline(struct stream *st) {
@@ -517,6 +519,8 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	gst_bus_add_watch(st->bus, bus_cb, st);
 	memset(st->elem, 0, sizeof(st->elem));
 	st->jitter = NULL;
+	st->sink = NULL;
+	st->last_pts = 0;
 	st->lost = 0;
 	st->late = 0;
 	st->n_starts = 0;
@@ -576,24 +580,46 @@ void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
 	st->vgap = vgap;
 }
 
-static bool stream_update_stats(struct stream *st) {
-	if (st->jitter) {
-		GstStructure *s;
-		g_object_get(st->jitter, "stats", &s, NULL);
-		if (s) {
-			guint64 lost, late;
-			gboolean r =
-			        gst_structure_get_uint64(s, "num-lost", &lost)
-			     && gst_structure_get_uint64(s, "num-late", &late);
-			gst_structure_free(s);
-			if (r) {
-				st->lost = lost;
-				st->late = late;
-				return true;
-			}
+/* Check sink to make sure that last-sample is updating.
+ * If not, post an EOS message on the bus. */
+static void stream_check_sink(struct stream *st) {
+	GstSample *s;
+	g_object_get(st->sink, "last-sample", &s, NULL);
+	if (s) {
+		GstBuffer *b = gst_sample_get_buffer(s);
+		GstClockTime t = GST_BUFFER_PTS(b);
+		gst_sample_unref(s);
+		if (t == st->last_pts) {
+			elog_err("PTS stuck at %lu; posting EOS\n", t);
+			gst_bus_post(st->bus, gst_message_new_eos(
+			             GST_OBJECT_CAST(st->sink)));
+		}
+		st->last_pts = t;
+	}
+}
+
+static bool stream_jitter_stats(struct stream *st) {
+	GstStructure *s;
+	g_object_get(st->jitter, "stats", &s, NULL);
+	if (s) {
+		guint64 lost, late;
+		gboolean r =
+		        gst_structure_get_uint64(s, "num-lost", &lost)
+		     && gst_structure_get_uint64(s, "num-late", &late);
+		gst_structure_free(s);
+		if (r) {
+			st->lost = lost;
+			st->late = late;
+			return true;
 		}
 	}
 	return false;
+}
+
+static bool stream_update_stats(struct stream *st) {
+	if (st->sink)
+		stream_check_sink(st);
+	return (st->jitter) && stream_jitter_stats(st);
 }
 
 bool stream_stats(struct stream *st) {

@@ -421,7 +421,7 @@ void mongrid_create(bool gui, bool stats) {
 		hide_cursor(window);
 	}
 	if (stats)
-		g_timeout_add(1000, do_stats, NULL);
+		g_timeout_add(2000, do_stats, NULL);
 }
 
 static void mongrid_init_gtk(uint32_t n_cells) {
