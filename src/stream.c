@@ -599,6 +599,11 @@ static void stream_check_sink(struct stream *st) {
 	}
 }
 
+void stream_check_eos(struct stream *st) {
+	if (st->sink)
+		stream_check_sink(st);
+}
+
 static bool stream_jitter_stats(struct stream *st) {
 	GstStructure *s;
 	g_object_get(st->jitter, "stats", &s, NULL);
@@ -620,8 +625,6 @@ static bool stream_jitter_stats(struct stream *st) {
 }
 
 static bool stream_update_stats(struct stream *st) {
-	if (st->sink)
-		stream_check_sink(st);
 	return (st->jitter) && stream_jitter_stats(st);
 }
 

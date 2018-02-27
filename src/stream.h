@@ -49,5 +49,6 @@ void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
 bool stream_stats(struct stream *st);
 bool stream_start(struct stream *st);
 void stream_stop(struct stream *st);
+void stream_check_eos(struct stream *st);
 
 #endif

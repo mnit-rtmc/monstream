@@ -389,6 +389,16 @@ static guint64 pkt_count(guint64 t0, guint64 t1) {
 	return (t0 < t1) ? t1 - t0 : 0;
 }
 
+static gboolean do_check_sink(gpointer data) {
+	lock_acquire(&grid.lock, __func__);
+	for (uint32_t n = 0; n < grid.n_cells; n++) {
+		struct moncell *mc = grid.cells + n;
+		stream_check_eos(&mc->stream);
+	}
+	lock_release(&grid.lock, __func__);
+	return TRUE;
+}
+
 static gboolean do_stats(gpointer data) {
 	lock_acquire(&grid.lock, __func__);
 	for (uint32_t n = 0; n < grid.n_cells; n++) {
@@ -428,8 +438,9 @@ void mongrid_create(bool gui, bool stats) {
 		gtk_window_fullscreen((GtkWindow *) window);
 		hide_cursor(window);
 	}
+	g_timeout_add(2000, do_check_sink, NULL);
 	if (stats)
-		g_timeout_add(2000, do_stats, NULL);
+		g_timeout_add(4000, do_stats, NULL);
 }
 
 static void mongrid_init_gtk(uint32_t n_cells) {
