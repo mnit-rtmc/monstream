@@ -226,9 +226,14 @@ static bool stream_is_rtsp(const struct stream *st) {
 	return strncmp("rtsp://", st->location, 7) == 0;
 }
 
+/* Check if location is SDP.  NOTE: After redirecting, this will be false */
 static bool stream_is_sdp(const struct stream *st) {
 	return stream_is_http(st)
 	    && (strstr(st->location, ".sdp") != NULL);
+}
+
+static bool stream_is_sdp_loc(const struct stream *st) {
+	return strlen(st->sdp_loc) > 0;
 }
 
 static void stream_add_mpeg4(struct stream *st) {
@@ -504,6 +509,7 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	memset(st->crop, 0, sizeof(st->crop));
 	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));
+	memset(st->sdp_loc, 0, sizeof(st->sdp_loc));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
 	memset(st->description, 0, sizeof(st->description));
@@ -561,11 +567,17 @@ void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
 {
 	nstr_wrap(st->cam_id, sizeof(st->cam_id), cam_id);
 	nstr_wrap(st->location, sizeof(st->location), loc);
+	if (stream_is_sdp(st)) {
+		nstr_wrap(st->sdp_loc, sizeof(st->sdp_loc), loc);
+		st->loc_hash = fnv_hash(st->sdp_loc, strlen(st->sdp_loc));
+	} else {
+		memset(st->sdp_loc, 0, sizeof(st->sdp_loc));
+		st->loc_hash = 0;
+	}
 	nstr_wrap(st->description, sizeof(st->description), desc);
 	nstr_wrap(st->encoding, sizeof(st->encoding), encoding);
 	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = latency;
-	st->loc_hash = fnv_hash(st->location, strlen(st->location));
 	st->n_starts = 0;
 }
 
@@ -667,7 +679,7 @@ static nstr_t stream_get_sdp_http(struct stream *st, nstr_t str) {
 
 	int64_t timeout = stream_timeout(st);
 	CURL *ch = curl_easy_init();
-	curl_easy_setopt(ch, CURLOPT_URL, st->location);
+	curl_easy_setopt(ch, CURLOPT_URL, st->sdp_loc);
 	curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, timeout);
 	curl_easy_setopt(ch, CURLOPT_TIMEOUT, timeout);
@@ -746,6 +758,7 @@ err:
 	gst_sdp_message_uninit(&msg);
 	return false;
 out:
+	/* Redirect location with value in SDP */
 	nstr_wrap(st->location, sizeof(st->location), udp_uri);
 	nstr_wrap(st->sprops, sizeof(st->sprops), sprops);
 	elog_err("SDP redirect to %s\n", st->location);
@@ -762,7 +775,7 @@ static void stream_reset_counters(struct stream *st) {
 static void stream_start_pipe(struct stream *st) {
 	/* NOTE: sdpdemux element has multiple bugs -- we need to handle sdp
 	 *       download ourselves, using curl. */
-	if (stream_is_sdp(st)) {
+	if (stream_is_sdp_loc(st)) {
 		char buf[1024];
 		nstr_t sdp = stream_get_sdp(st, nstr_make(buf, sizeof(buf), 0));
 		if (nstr_len(sdp) > 0)

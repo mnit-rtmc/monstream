@@ -15,6 +15,7 @@ struct stream {
 	char		crop[6];         /* crop code */
 	char		cam_id[20];      /* camera ID */
 	char		location[128];
+	char		sdp_loc[128];
 	char		description[64];
 	char		encoding[8];
 	char		sprops[64];
