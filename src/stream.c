@@ -753,6 +753,12 @@ out:
 	return true;
 }
 
+static void stream_reset_counters(struct stream *st) {
+	st->pushed = 0;
+	st->lost = 0;
+	st->late = 0;
+}
+
 static void stream_start_pipe(struct stream *st) {
 	/* NOTE: sdpdemux element has multiple bugs -- we need to handle sdp
 	 *       download ourselves, using curl. */
@@ -762,6 +768,7 @@ static void stream_start_pipe(struct stream *st) {
 		if (nstr_len(sdp) > 0)
 			stream_sdp_parse(st, sdp);
 	}
+	stream_reset_counters(st);
 	stream_start_pipeline(st);
 }
 
