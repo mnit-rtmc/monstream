@@ -149,6 +149,7 @@ static void moncell_restart_stream(struct moncell *mc) {
 	if (!mc->started) {
 		bool s = stream_start(&mc->stream);
 		mc->started = TRUE;
+		mc->clear = FALSE;
 		if (!s)
 			moncell_update_accent_title(mc);
 	}
@@ -177,7 +178,6 @@ static gboolean draw_cb(GtkWidget *widget, cairo_t *cr, gpointer data) {
 		guint height = gtk_widget_get_allocated_height(widget);
 		cairo_rectangle(cr, 0, 0, width, height);
 		cairo_fill(cr);
-		mc->clear = FALSE;
 	}
 	lock_release(&grid.lock, __func__);
 	return TRUE;
