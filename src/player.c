@@ -125,9 +125,19 @@ static void proc_monitor(nstr_t cmd, bool store) {
 }
 
 static void proc_config(nstr_t cmd) {
-	elog_cmd(cmd);
-	config_store("config", cmd);
-	mongrid_restart();
+	nstr_t str     = nstr_dup(cmd);
+	nstr_t config  = nstr_split(&str, UNIT_SEP);	// "config"
+	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
+	assert(nstr_cmp_z(config, "config"));
+	int mon = nstr_parse_u32(mdx);
+	if (mon >= 0) {
+		elog_cmd(cmd);
+		if (mon > 0) {
+			config_store("config", cmd);
+			mongrid_restart();
+		}
+	} else
+		elog_err("Invalid config: %s\n", nstr_z(cmd));
 }
 
 static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
