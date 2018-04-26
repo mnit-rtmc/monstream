@@ -37,6 +37,7 @@ struct player {
 	pthread_t  cmd_tid;
 	pthread_t  stat_tid;
 	pthread_t  joy_tid;
+	bool       configuring; // does this need a mutex?
 };
 
 /* ASCII separators */
@@ -57,7 +58,7 @@ static uint32_t parse_font_sz(nstr_t fsz) {
 	return (s > 0) ? s : DEFAULT_FONT_SZ;
 }
 
-static void proc_display(struct player *plyr, nstr_t cmd) {
+static void player_display(struct player *plyr, nstr_t cmd) {
 	nstr_t str     = nstr_dup(cmd);
 	nstr_t display = nstr_split(&str, UNIT_SEP);    // "display"
 	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
@@ -68,7 +69,7 @@ static void proc_display(struct player *plyr, nstr_t cmd) {
 	mongrid_display(mid, cam, seq);
 }
 
-static void proc_play(nstr_t cmd, bool store) {
+static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t str      = nstr_dup(cmd);
 	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
 	nstr_t mdx      = nstr_split(&str, UNIT_SEP);   // mon index
@@ -80,9 +81,12 @@ static void proc_play(nstr_t cmd, bool store) {
 	assert(nstr_cmp_z(play, "play"));
 	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
-		uint32_t latency = parse_latency(lat);
 		elog_cmd(cmd);
-		mongrid_play_stream(mon, cam_id, loc, desc, encoding, latency);
+		if (!plyr->configuring) {
+			uint32_t latency = parse_latency(lat);
+			mongrid_play_stream(mon, cam_id, loc, desc, encoding,
+				latency);
+		}
 		if (store) {
 			char fname[16];
 			sprintf(fname, "play.%d", mon);
@@ -92,7 +96,7 @@ static void proc_play(nstr_t cmd, bool store) {
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static void proc_monitor(nstr_t cmd, bool store) {
+static void player_monitor(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t str     = nstr_dup(cmd);
 	nstr_t monitor = nstr_split(&str, UNIT_SEP);    // "monitor"
 	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
@@ -107,14 +111,16 @@ static void proc_monitor(nstr_t cmd, bool store) {
 	assert(nstr_cmp_z(monitor, "monitor"));
 	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
-		int32_t accent = nstr_parse_hex(acc);
-		int aspect = nstr_parse_u32(asp);
-		uint32_t font_sz = parse_font_sz(sz);
-		uint32_t hgap = nstr_parse_u32(hg);
-		uint32_t vgap = nstr_parse_u32(vg);
 		elog_cmd(cmd);
-		mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop, hgap,
-			vgap, extra);
+		if (!plyr->configuring) {
+			int32_t accent = nstr_parse_hex(acc);
+			int aspect = nstr_parse_u32(asp);
+			uint32_t font_sz = parse_font_sz(sz);
+			uint32_t hgap = nstr_parse_u32(hg);
+			uint32_t vgap = nstr_parse_u32(vg);
+			mongrid_set_mon(mon, mid, accent, aspect, font_sz, crop,
+				hgap, vgap, extra);
+		}
 		if (store) {
 			char fname[16];
 			sprintf(fname, "monitor.%d", mon);
@@ -124,7 +130,7 @@ static void proc_monitor(nstr_t cmd, bool store) {
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));
 }
 
-static void proc_config(nstr_t cmd) {
+static void player_config(struct player *plyr, nstr_t cmd) {
 	nstr_t str     = nstr_dup(cmd);
 	nstr_t config  = nstr_split(&str, UNIT_SEP);	// "config"
 	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
@@ -134,8 +140,10 @@ static void proc_config(nstr_t cmd) {
 		elog_cmd(cmd);
 		if (mon > 0) {
 			config_store("config", cmd);
+			plyr->configuring = false;
 			mongrid_restart();
-		}
+		} else
+			plyr->configuring = true;
 	} else
 		elog_err("Invalid config: %s\n", nstr_z(cmd));
 }
@@ -143,13 +151,13 @@ static void proc_config(nstr_t cmd) {
 static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "display"))
-		proc_display(plyr, cmd);
+		player_display(plyr, cmd);
 	else if (nstr_cmp_z(p1, "play"))
-		proc_play(cmd, store);
+		player_play(plyr, cmd, store);
 	else if (nstr_cmp_z(p1, "monitor"))
-		proc_monitor(cmd, store);
+		player_monitor(plyr, cmd, store);
 	else if (nstr_cmp_z(p1, "config"))
-		proc_config(cmd);
+		player_config(plyr, cmd);
 	else
 		elog_err("Invalid command: %s\n", nstr_z(cmd));
 }
@@ -299,6 +307,7 @@ void run_player(bool gui, bool stats, const char *port) {
 	plyr.cmd_tid = player_create_thread(&plyr, cmd_thread);
 	plyr.stat_tid = player_create_thread(&plyr, status_thread);
 	plyr.joy_tid = player_create_thread(&plyr, joy_thread);
+	plyr.configuring = false;
 	player_install_handler(&plyr);
 	while (plyr.cmd_tid && plyr.stat_tid && plyr.joy_tid) {
 		uint32_t mon = load_config();

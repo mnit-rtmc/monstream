@@ -8,7 +8,7 @@ Messages are separated by ASCII record separator (30).
 ### Config
 
 1. config
-2. Monitor count (1-16)
+2. Monitor count (1-16) (or 0 => begin configuration)
 
 ### Monitor
 
