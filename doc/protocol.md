@@ -8,7 +8,7 @@ Messages are separated by ASCII record separator (30).
 ### Config
 
 1. config
-2. Monitor count (1-16) (or 0 => begin configuration)
+2. Monitor count (1-16) (or 0 -> begin configuration)
 
 ### Monitor
 
@@ -22,7 +22,7 @@ Messages are separated by ASCII record separator (30).
    Horizontal index, span, vertical index, span
 8. Horizontal gap (1 -> 0.01%)
 9. Vertical gap (20 -> 0.2%)
-10. Extra monitor label
+10. Extra monitor label (full-screen)
 
 ### Play
 
@@ -54,6 +54,7 @@ received command.
 2. Monitor index (0 to 15)
 3. Camera ID
 4. Stream status error (blank for OK)
+5. Mode: "full" or ""
 
 ### Query
 

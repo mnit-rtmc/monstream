@@ -570,21 +570,25 @@ void mongrid_destroy(void) {
 static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
-static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx) {
+static nstr_t moncell_status(struct moncell *mc, nstr_t str, uint32_t idx,
+	bool full)
+{
 	char buf[64];
 
-	snprintf(buf, sizeof(buf), "status%c%d%c%s%c%s%c", UNIT_SEP,
+	snprintf(buf, sizeof(buf), "status%c%d%c%s%c%s%c%s%c", UNIT_SEP,
 		idx, UNIT_SEP,
 		moncell_get_cam_id(mc), UNIT_SEP,
-		(mc->failed) ? "failed" : "", RECORD_SEP);
+		(mc->failed) ? "failed" : "", UNIT_SEP,
+		(full) ? "full" : "", RECORD_SEP);
 	nstr_cat_z(&str, buf);
 	return str;
 }
 
 nstr_t mongrid_status(nstr_t str) {
 	lock_acquire(&grid.lock, __func__);
+	bool full = (1 == grid.n_cells);
 	for (uint32_t n = 0; n < grid.n_cells; n++)
-		str = moncell_status(grid.cells + n, str, n);
+		str = moncell_status(grid.cells + n, str, n, full);
 	if (grid.mbar)
 		str = modebar_status(grid.mbar, str);
 	lock_release(&grid.lock, __func__);
