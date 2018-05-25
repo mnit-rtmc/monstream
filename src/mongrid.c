@@ -48,7 +48,6 @@ struct moncell {
 	GtkWidget	*ex_lbl;
 	gboolean	started;
 	gboolean        failed;
-	gboolean	clear;
 };
 
 struct mongrid {
@@ -149,12 +148,11 @@ static gboolean draw_cb(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	struct moncell *mc = data;
 	lock_acquire(&grid.lock, __func__);
 	/* moncell may have been freed while timer ran */
-	if (is_moncell_valid(mc) && mc->clear) {
+	if (is_moncell_valid(mc)) {
 		guint width = gtk_widget_get_allocated_width(widget);
 		guint height = gtk_widget_get_allocated_height(widget);
 		cairo_rectangle(cr, 0, 0, width, height);
 		cairo_fill(cr);
-		mc->clear = FALSE;
 	}
 	lock_release(&grid.lock, __func__);
 	return TRUE;
@@ -164,7 +162,6 @@ static gboolean draw_cb(GtkWidget *widget, cairo_t *cr, gpointer data) {
 static void moncell_clear(struct moncell *mc) {
 	guint width = gtk_widget_get_allocated_width(mc->video);
 	guint height = gtk_widget_get_allocated_height(mc->video);
-	mc->clear = TRUE;
 	gtk_widget_queue_draw_area(mc->video, 0, 0, width, height);
 }
 
@@ -293,7 +290,6 @@ static void moncell_init(struct moncell *mc, uint32_t idx) {
 	mc->font_sz = 32;
 	mc->started = FALSE;
 	mc->failed = TRUE;
-	mc->clear = TRUE;
 	if (grid.window)
 		moncell_init_gtk(mc);
 }
