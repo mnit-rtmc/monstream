@@ -136,6 +136,17 @@ fail:
 	return -1;
 }
 
+static void cxn_set_timeout(struct cxn *cxn, int fd) {
+	struct timeval tv;
+	tv.tv_sec = 35;
+	tv.tv_usec = 0;
+	// Set receive timeout to 35 seconds -- first poll should be received
+	// within 30 seconds.  Normally, cxn_send will disconnect on error,
+	// but this will allow cxn_recv to disconnect after the timeout.
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0)
+		elog_err("setsockopt: %s\n", strerror(errno));
+}
+
 void cxn_bind(struct cxn *cxn, const char *service) {
 	int fd;
 	while (true) {
@@ -144,6 +155,7 @@ void cxn_bind(struct cxn *cxn, const char *service) {
 			break;
 		sleep(1);
 	};
+	cxn_set_timeout(cxn, fd);
 	cxn_set_fd(cxn, fd);
 }
 
@@ -172,7 +184,7 @@ void cxn_send(struct cxn *cxn, nstr_t str) {
 	len = cxn_get_addr(cxn, &addr);
 	n = sendto(fd, str.buf, str.len, 0, (struct sockaddr *) &addr, len);
 	if (n < 0) {
-		elog_err("Send socket: %s\n", strerror(errno));
+		elog_err("sendto: %s\n", strerror(errno));
 		cxn_log(cxn, "send error");
 		cxn_disconnect(cxn, fd);
 	}
@@ -203,13 +215,11 @@ nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 		if (!cxn_established(cxn))
 			cxn_connect(cxn, fd, &addr, len);
 	} else {
-		if (ECONNREFUSED == errno)
-			cxn_disconnect(cxn, fd);
-		else {
-			elog_err("Read socket: %s\n", strerror(errno));
-			cxn_log(cxn, "recv error");
-		}
+		elog_err("recvfrom: %s\n", strerror(errno));
+		cxn_log(cxn, "recv error");
 		str.len = 0;
+		if (errno != 0 && errno != EINTR)
+			cxn_disconnect(cxn, fd);
 	}
 	return str;
 }
@@ -217,6 +227,6 @@ nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 void cxn_destroy(struct cxn *cxn) {
 	int fd = cxn_get_fd(cxn);
 	if (fd && (close(fd) < 0))
-		elog_err("Close: %s\n", strerror(errno));
+		elog_err("close: %s\n", strerror(errno));
 	lock_destroy(&cxn->lock);
 }
