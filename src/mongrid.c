@@ -158,7 +158,6 @@ static gboolean draw_cb(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	return TRUE;
 }
 
-
 static void moncell_clear(struct moncell *mc) {
 	guint width = gtk_widget_get_allocated_width(mc->video);
 	guint height = gtk_widget_get_allocated_height(mc->video);
