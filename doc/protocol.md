@@ -43,6 +43,12 @@ Sent in response to query message.
 3. Camera ID
 4. Sequence # (ending with " if paused)
 
+### Heartbeat
+
+Send every 30 seconds.
+
+1. heartbeat
+
 ## Messages from VDU to IRIS
 
 ### Status

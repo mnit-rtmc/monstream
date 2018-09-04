@@ -69,6 +69,13 @@ static void player_display(struct player *plyr, nstr_t cmd) {
 	mongrid_display(mid, cam, seq);
 }
 
+static void player_heartbeat(struct player *plyr, nstr_t cmd) {
+	nstr_t str     = nstr_dup(cmd);
+	nstr_t display = nstr_split(&str, UNIT_SEP);    // "heartbeat"
+	assert(nstr_cmp_z(display, "heartbeat"));
+	elog_cmd(cmd);
+}
+
 static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t str      = nstr_dup(cmd);
 	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
@@ -152,6 +159,8 @@ static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "display"))
 		player_display(plyr, cmd);
+	else if (nstr_cmp_z(p1, "heartbeat"))
+		player_heartbeat(plyr, cmd);
 	else if (nstr_cmp_z(p1, "play"))
 		player_play(plyr, cmd, store);
 	else if (nstr_cmp_z(p1, "monitor"))
