@@ -215,10 +215,11 @@ nstr_t cxn_recv(struct cxn *cxn, nstr_t str) {
 		if (!cxn_established(cxn))
 			cxn_connect(cxn, fd, &addr, len);
 	} else {
-		elog_err("recvfrom: %s\n", strerror(errno));
+		int e = errno;
+		elog_err("recvfrom: %s\n", strerror(e));
 		cxn_log(cxn, "recv error");
 		str.len = 0;
-		if (errno != 0 && errno != EINTR)
+		if (e != 0 && e != EINTR)
 			cxn_disconnect(cxn, fd);
 	}
 	return str;
