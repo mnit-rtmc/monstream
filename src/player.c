@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include "elog.h"
 #include "nstr.h"
+#include "sdp.h"
 #include "config.h"
 #include "mongrid.h"
 #include "cxn.h"
@@ -85,19 +86,32 @@ static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t encoding = nstr_split(&str, UNIT_SEP);   // encoding
 	nstr_t desc     = nstr_split(&str, UNIT_SEP);   // title
 	nstr_t lat      = nstr_split(&str, UNIT_SEP);   // latency
+	nstr_t sprops   = nstr_empty();
 	assert(nstr_cmp_z(play, "play"));
 	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
+		struct sdp_data sdp;
+		uint32_t latency = parse_latency(lat);
 		elog_cmd(cmd);
+		sdp_data_init(&sdp, loc);
+		if (sdp_data_cache(&sdp)) {
+			loc = sdp.udp;
+			sprops = sdp.sprops;
+		}
 		if (!plyr->configuring) {
-			uint32_t latency = parse_latency(lat);
 			mongrid_play_stream(mon, cam_id, loc, desc, encoding,
-				latency);
+				latency, sprops);
 		}
 		if (store) {
 			char fname[16];
 			sprintf(fname, "play.%d", mon);
 			config_store(fname, cmd);
+		}
+		if (store && sdp_data_fetch(&sdp)) {
+			loc = sdp.udp;
+			sprops = sdp.sprops;
+			mongrid_play_stream(mon, cam_id, loc, desc, encoding,
+				latency, sprops);
 		}
 	} else
 		elog_err("Invalid monitor: %s\n", nstr_z(cmd));

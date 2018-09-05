@@ -19,6 +19,14 @@
 #include <string.h>
 #include "nstr.h"
 
+nstr_t nstr_empty(void) {
+	nstr_t str;
+	str.buf = NULL;
+	str.buf_len = 0;
+	str.len = 0;
+	return str;
+}
+
 nstr_t nstr_make(char *buf, uint32_t buf_len, uint32_t len) {
 	assert(buf_len >= len);
 	nstr_t str;
@@ -117,6 +125,39 @@ bool nstr_cmp_z(nstr_t str, const char *buf) {
 	return buf[str.len] == '\0';
 }
 
+bool nstr_equals(nstr_t a, nstr_t b) {
+	if (a.len == b.len) {
+		for (int i = 0; i < a.len; i++) {
+			if (a.buf[i] != b.buf[i])
+				return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+bool nstr_starts_with(nstr_t str, const char *buf) {
+	for (int i = 0; i < str.len; i++) {
+		if ('\0' == buf[i])
+			return true;
+		if (str.buf[i] != buf[i])
+			return false;
+	}
+	// buf longer than str
+	return false;
+}
+
+bool nstr_contains(nstr_t str, const char *buf) {
+	while (str.len > 0) {
+		if (nstr_starts_with(str, buf))
+			return true;
+		str.buf++;
+		str.buf_len--;
+		str.len--;
+	}
+	return false;
+}
+
 bool nstr_wrap(char *buf, size_t n, nstr_t str) {
 	bool trunc;
 	nstr_t tmp = nstr_make(buf, n, 0);
@@ -156,4 +197,15 @@ int32_t nstr_parse_hex(nstr_t hex) {
 		v |= d;
 	}
 	return v;
+}
+
+uint64_t nstr_hash_fnv(nstr_t str) {
+	const void *key = str.buf;
+	const uint8_t *p = key;
+	uint64_t h = 14695981039346656037UL;
+	int i;
+	for (i = 0; i < str.len; i++) {
+		h = (h * 1099511628211UL) ^ p[i];
+	}
+	return h;
 }

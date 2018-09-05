@@ -313,11 +313,11 @@ static void moncell_set_handle(struct moncell *mc) {
 }
 
 static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
-	nstr_t desc, nstr_t encoding, uint32_t latency)
+	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
 	nstr_t d = moncell_has_title(mc) ? nstr_make(NULL, 0, 0) : desc;
 	moncell_set_description(mc, desc);
-	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency);
+	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency, sprops);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 }
@@ -543,12 +543,13 @@ void mongrid_set_mon(uint32_t idx, nstr_t mid, int32_t accent, bool aspect,
 }
 
 void mongrid_play_stream(uint32_t idx, nstr_t cam_id, nstr_t loc, nstr_t desc,
-	nstr_t encoding, uint32_t latency)
+	nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
 	lock_acquire(&grid.lock, __func__);
 	if (idx < grid.n_cells) {
 		struct moncell *mc = grid.cells + idx;
-		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency);
+		moncell_play_stream(mc, cam_id, loc, desc, encoding, latency,
+			sprops);
 	}
 	lock_release(&grid.lock, __func__);
 }

@@ -11,6 +11,7 @@ struct nstr {
 };
 typedef struct nstr nstr_t;
 
+nstr_t nstr_empty(void);
 nstr_t nstr_make(char *buf, uint32_t buf_len, uint32_t len);
 nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, uint32_t len, nstr_t src);
 nstr_t nstr_dup(nstr_t o);
@@ -22,8 +23,12 @@ const char *nstr_z(nstr_t str);
 nstr_t nstr_split(nstr_t *str, char c);
 nstr_t nstr_chop(nstr_t str, char c);
 bool nstr_cmp_z(nstr_t str, const char *buf);
+bool nstr_equals(nstr_t a, nstr_t b);
+bool nstr_starts_with(nstr_t str, const char *buf);
+bool nstr_contains(nstr_t str, const char *buf);
 bool nstr_wrap(char *buf, size_t n, nstr_t str);
 int32_t nstr_parse_u32(nstr_t str);
 int32_t nstr_parse_hex(nstr_t hex);
+uint64_t nstr_hash_fnv(nstr_t str);
 
 #endif

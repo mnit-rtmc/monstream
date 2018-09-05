@@ -13,8 +13,6 @@
  */
 
 #include <stdio.h>
-#include <curl/curl.h>
-#include <gst/sdp/sdp.h>
 #include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
 #include "elog.h"
@@ -226,16 +224,6 @@ static bool stream_is_rtsp(const struct stream *st) {
 	return strncmp("rtsp://", st->location, 7) == 0;
 }
 
-/* Check if location is SDP.  NOTE: After redirecting, this will be false */
-static bool stream_is_sdp(const struct stream *st) {
-	return stream_is_http(st)
-	    && (strstr(st->location, ".sdp") != NULL);
-}
-
-static bool stream_is_sdp_loc(const struct stream *st) {
-	return strlen(st->sdp_loc) > 0;
-}
-
 static void stream_add_mpeg4(struct stream *st) {
 	GstElement *dec = gst_element_factory_make("avdec_mpeg4", NULL);
 	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
@@ -264,9 +252,7 @@ static void stream_add_later_elements(struct stream *st) {
 		stream_add_text(st);
 	}
 	stream_add_videobox(st);
-	if (stream_is_sdp(st)) {
-		stream_add_png(st);
-	} else if (strcmp("H264", st->encoding) == 0) {
+	if (strcmp("H264", st->encoding) == 0) {
 		stream_add_h264(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
 		stream_add_mpeg4(st);
@@ -509,11 +495,9 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	memset(st->crop, 0, sizeof(st->crop));
 	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));
-	memset(st->sdp_loc, 0, sizeof(st->sdp_loc));
 	memset(st->encoding, 0, sizeof(st->encoding));
 	memset(st->sprops, 0, sizeof(st->sprops));
 	memset(st->description, 0, sizeof(st->description));
-	st->loc_hash = 0;
 	st->latency = DEFAULT_LATENCY;
 	st->font_sz = 22;
 	st->hgap = 0;
@@ -530,7 +514,6 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->pushed = 0;
 	st->lost = 0;
 	st->late = 0;
-	st->n_starts = 0;
 	st->do_stop = NULL;
 	st->ack_started = NULL;
 }
@@ -551,34 +534,15 @@ void stream_set_aspect(struct stream *st, bool aspect) {
 	st->aspect = aspect;
 }
 
-static uint64_t fnv_hash(const char *str, uint32_t len) {
-	const void *key = str;
-	const uint8_t *p = key;
-	uint64_t h = 14695981039346656037UL;
-	int i;
-	for (i = 0; i < len; i++) {
-		h = (h * 1099511628211UL) ^ p[i];
-	}
-	return h;
-}
-
 void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
-	nstr_t desc, nstr_t encoding, uint32_t latency)
+	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
 	nstr_wrap(st->cam_id, sizeof(st->cam_id), cam_id);
 	nstr_wrap(st->location, sizeof(st->location), loc);
-	if (stream_is_sdp(st)) {
-		nstr_wrap(st->sdp_loc, sizeof(st->sdp_loc), loc);
-		st->loc_hash = fnv_hash(st->sdp_loc, strlen(st->sdp_loc));
-	} else {
-		memset(st->sdp_loc, 0, sizeof(st->sdp_loc));
-		st->loc_hash = 0;
-	}
 	nstr_wrap(st->description, sizeof(st->description), desc);
 	nstr_wrap(st->encoding, sizeof(st->encoding), encoding);
-	memset(st->sprops, 0, sizeof(st->sprops));
 	st->latency = latency;
-	st->n_starts = 0;
+	nstr_wrap(st->sprops, sizeof(st->sprops), sprops);
 }
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
@@ -662,110 +626,6 @@ bool stream_stats(struct stream *st) {
 		return false;
 }
 
-static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
-	size_t sz = size * nmemb;
-	nstr_t *str = (nstr_t *) uptr;
-	nstr_t src = nstr_make(contents, sz, sz);
-	nstr_cat(str, src);
-	return nstr_len(*str);
-}
-
-static int64_t stream_timeout(const struct stream *st) {
-	return (st->n_starts) <= 1 ? 1L : 5L;
-}
-
-static nstr_t stream_get_sdp_http(struct stream *st, nstr_t str) {
-	CURLcode rc;
-
-	int64_t timeout = stream_timeout(st);
-	CURL *ch = curl_easy_init();
-	curl_easy_setopt(ch, CURLOPT_URL, st->sdp_loc);
-	curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, timeout);
-	curl_easy_setopt(ch, CURLOPT_TIMEOUT, timeout);
-	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, sdp_write);
-	curl_easy_setopt(ch, CURLOPT_WRITEDATA, &str);
-	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, 0);
-	rc = curl_easy_perform(ch);
-	if (rc != CURLE_OK) {
-		elog_err("curl error: %s\n", curl_easy_strerror(rc));
-		str = nstr_make(str.buf, 0, 0);
-	}
-	curl_easy_cleanup(ch);
-	return str;
-}
-
-static nstr_t stream_get_sdp(struct stream *st, nstr_t str) {
-	if (st->n_starts == 0) {
-		str = config_load_cache(st->loc_hash, str);
-	}
-	if (nstr_len(str) == 0) {
-		str = stream_get_sdp_http(st, str);
-		if (nstr_len(str) > 0)
-			config_store_cache(st->loc_hash, str);
-	}
-	st->n_starts++;
-	return str;
-}
-
-static bool stream_sdp_parse(struct stream *st, nstr_t sdp) {
-	char sp_buf[64];
-	char udp_buf[64];
-	nstr_t udp_uri = nstr_make(udp_buf, sizeof(udp_buf), 0);
-	nstr_t sprops = nstr_make(sp_buf, sizeof(sp_buf), 0);
-	GstSDPMessage msg;
-	memset(&msg, 0, sizeof(msg));
-	if (gst_sdp_message_init(&msg) != GST_SDP_OK) {
-		elog_err("gst_sdp_message_init error\n");
-		return false;
-	}
-	if (gst_sdp_message_parse_buffer((const guint8 *) sdp.buf, sdp.len,
-		&msg) != GST_SDP_OK)
-	{
-		elog_err("gst_sdp_message_parse_buffer error\n");
-		goto err;
-	}
-	guint n_medias = gst_sdp_message_medias_len(&msg);
-	for (guint i = 0; i < n_medias; i++) {
-		char uri[64];
-		const GstSDPMedia *media = gst_sdp_message_get_media(&msg, i);
-		const GstSDPConnection *conn;
-		const GstCaps *caps;
-		const GstStructure *gstr;
-		const char *sp;
-
-		if (strncmp("video", gst_sdp_media_get_media(media), 5) != 0)
-			continue;
-		conn = gst_sdp_media_get_connection(media, 0);
-		if (!gst_sdp_address_is_multicast(conn->nettype, conn->addrtype,
-			conn->address))
-			continue;
-		caps = gst_sdp_media_get_caps_from_media(media, (gint) 96);
-		gstr = gst_caps_get_structure(caps, 0);
-		if (!gst_structure_has_field_typed(gstr,
-			"sprop-parameter-sets", G_TYPE_STRING))
-			continue;
-
-		snprintf(uri, sizeof(uri), "udp://%s:%d", conn->address,
-			gst_sdp_media_get_port(media));
-		nstr_cat_z(&udp_uri, uri);
-		sp = gst_structure_get_string(gstr, "sprop-parameter-sets");
-		nstr_cat_z(&sprops, sp);
-		goto out;
-	}
-	elog_err("streap_sdp_parse failed: no valid media\n");
-err:
-	gst_sdp_message_uninit(&msg);
-	return false;
-out:
-	/* Redirect location with value in SDP */
-	nstr_wrap(st->location, sizeof(st->location), udp_uri);
-	nstr_wrap(st->sprops, sizeof(st->sprops), sprops);
-	elog_err("SDP redirect to %s\n", st->location);
-	gst_sdp_message_uninit(&msg);
-	return true;
-}
-
 static void stream_reset_counters(struct stream *st) {
 	st->pushed = 0;
 	st->lost = 0;
@@ -773,14 +633,6 @@ static void stream_reset_counters(struct stream *st) {
 }
 
 static void stream_start_pipe(struct stream *st) {
-	/* NOTE: sdpdemux element has multiple bugs -- we need to handle sdp
-	 *       download ourselves, using curl. */
-	if (stream_is_sdp_loc(st)) {
-		char buf[1024];
-		nstr_t sdp = stream_get_sdp(st, nstr_make(buf, sizeof(buf), 0));
-		if (nstr_len(sdp) > 0)
-			stream_sdp_parse(st, sdp);
-	}
 	stream_reset_counters(st);
 	stream_start_pipeline(st);
 }

@@ -15,11 +15,9 @@ struct stream {
 	char		crop[6];         /* crop code */
 	char		cam_id[20];      /* camera ID */
 	char		location[128];
-	char		sdp_loc[128];
 	char		description[64];
 	char		encoding[8];
 	char		sprops[64];
-	uint64_t	loc_hash;
 	uint32_t	latency;
 	uint32_t	font_sz;
 	uint32_t	hgap;
@@ -33,7 +31,6 @@ struct stream {
 	guint64		pushed;
 	guint64		lost;
 	guint64		late;
-	uint32_t	n_starts;
 	void		(*do_stop)	(struct stream *st);
 	void		(*ack_started)	(struct stream *st);
 };
@@ -46,7 +43,7 @@ void stream_set_font_size(struct stream *st, uint32_t sz);
 void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
 	uint32_t vgap);
 void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
-	nstr_t desc, nstr_t encoding, uint32_t latency);
+	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops);
 bool stream_stats(struct stream *st);
 bool stream_start(struct stream *st);
 void stream_stop(struct stream *st);
