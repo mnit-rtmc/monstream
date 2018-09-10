@@ -59,14 +59,6 @@ nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len) {
 	return str;
 }
 
-nstr_t nstr_dup(nstr_t o) {
-	nstr_t str;
-	str.buf = o.buf;
-	str.buf_len = o.buf_len;
-	str.len = o.len;
-	return str;
-}
-
 uint32_t nstr_len(nstr_t str) {
 	return str.len;
 }

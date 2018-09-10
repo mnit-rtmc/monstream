@@ -60,7 +60,7 @@ static uint32_t parse_font_sz(nstr_t fsz) {
 }
 
 static void player_display(struct player *plyr, nstr_t cmd) {
-	nstr_t str     = nstr_dup(cmd);
+	nstr_t str     = cmd;
 	nstr_t display = nstr_split(&str, UNIT_SEP);    // "display"
 	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
 	nstr_t cam     = nstr_split(&str, UNIT_SEP);    // camera ID
@@ -71,14 +71,14 @@ static void player_display(struct player *plyr, nstr_t cmd) {
 }
 
 static void player_heartbeat(struct player *plyr, nstr_t cmd) {
-	nstr_t str     = nstr_dup(cmd);
+	nstr_t str     = cmd;
 	nstr_t display = nstr_split(&str, UNIT_SEP);    // "heartbeat"
 	assert(nstr_cmp_z(display, "heartbeat"));
 	elog_cmd(cmd);
 }
 
 static void player_play(struct player *plyr, nstr_t cmd, bool store) {
-	nstr_t str      = nstr_dup(cmd);
+	nstr_t str      = cmd;
 	nstr_t play     = nstr_split(&str, UNIT_SEP);   // "play"
 	nstr_t mdx      = nstr_split(&str, UNIT_SEP);   // mon index
 	nstr_t cam_id   = nstr_split(&str, UNIT_SEP);   // camera ID
@@ -118,7 +118,7 @@ static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 }
 
 static void player_monitor(struct player *plyr, nstr_t cmd, bool store) {
-	nstr_t str     = nstr_dup(cmd);
+	nstr_t str     = cmd;
 	nstr_t monitor = nstr_split(&str, UNIT_SEP);    // "monitor"
 	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
 	nstr_t mid     = nstr_split(&str, UNIT_SEP);    // monitor ID
@@ -152,7 +152,7 @@ static void player_monitor(struct player *plyr, nstr_t cmd, bool store) {
 }
 
 static void player_config(struct player *plyr, nstr_t cmd) {
-	nstr_t str     = nstr_dup(cmd);
+	nstr_t str     = cmd;
 	nstr_t config  = nstr_split(&str, UNIT_SEP);	// "config"
 	nstr_t mdx     = nstr_split(&str, UNIT_SEP);    // mon index
 	assert(nstr_cmp_z(config, "config"));
