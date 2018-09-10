@@ -45,8 +45,7 @@ void sdp_data_init(struct sdp_data *sdp, nstr_t loc) {
 	sdp->loc_hash = nstr_hash_fnv(loc);
 	sdp->cache = nstr_make(sdp->cache_buf, sizeof(sdp->cache_buf), 0);
 	sdp->fetch = nstr_make(sdp->fetch_buf, sizeof(sdp->fetch_buf), 0);
-	sdp->loc = nstr_make(sdp->loc_buf, sizeof(sdp->loc_buf), 0);
-	nstr_cpy(&sdp->loc, loc);
+	sdp->loc = nstr_make_cpy(sdp->loc_buf, sizeof(sdp->loc_buf), loc);
 	sdp->udp = nstr_make(sdp->udp_buf, sizeof(sdp->udp_buf), 0);
 	sdp->sprops = nstr_make(sdp->sprop_buf, sizeof(sdp->sprop_buf), 0);
 }

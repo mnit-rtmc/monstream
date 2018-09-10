@@ -34,8 +34,13 @@ nstr_t nstr_make(char *buf, uint32_t buf_len, uint32_t len) {
 	return str;
 }
 
-nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, uint32_t len, nstr_t src) {
-	nstr_t dst = nstr_make(buf, buf_len, len);
+static bool nstr_cpy(nstr_t *dst, nstr_t src) {
+	dst->len = 0;
+	return nstr_cat(dst, src);
+}
+
+nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, nstr_t src) {
+	nstr_t dst = nstr_make(buf, buf_len, 0);
 	nstr_cpy(&dst, src);
 	return dst;
 }
@@ -62,11 +67,6 @@ bool nstr_cat(nstr_t *dst, nstr_t src) {
 		memcpy(dst->buf + dst->len, src.buf, n);
 	dst->len += n;
 	return trunc;
-}
-
-bool nstr_cpy(nstr_t *dst, nstr_t src) {
-	dst->len = 0;
-	return nstr_cat(dst, src);
 }
 
 bool nstr_cat_z(nstr_t *dst, const char *src) {
