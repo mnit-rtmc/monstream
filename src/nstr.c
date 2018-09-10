@@ -59,6 +59,11 @@ nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len) {
 	return str;
 }
 
+/** Get the length of an nstr.
+ *
+ * @param str The string.
+ * @return Length (bytes).
+ */
 uint32_t nstr_len(nstr_t str) {
 	return str.len;
 }
