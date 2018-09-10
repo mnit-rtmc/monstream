@@ -86,7 +86,7 @@ static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t encoding = nstr_split(&str, UNIT_SEP);   // encoding
 	nstr_t desc     = nstr_split(&str, UNIT_SEP);   // title
 	nstr_t lat      = nstr_split(&str, UNIT_SEP);   // latency
-	nstr_t sprops   = nstr_empty();
+	nstr_t sprops   = nstr_init_empty();
 	assert(nstr_cmp_z(play, "play"));
 	int mon = nstr_parse_u32(mdx);
 	if (mon >= 0) {
@@ -193,7 +193,7 @@ static void player_proc_cmds(struct player *plyr, nstr_t str, bool store) {
 
 static void player_read_cmds(struct player *plyr) {
 	char buf[1024];
-	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	nstr_t str = nstr_init(buf, sizeof(buf));
 	player_proc_cmds(plyr, cxn_recv(plyr->cxn, str), true);
 }
 
@@ -210,7 +210,7 @@ static void *cmd_thread(void *arg) {
 static void player_send_status(struct player *plyr) {
 	char buf[256];
 
-	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	nstr_t str = nstr_init(buf, sizeof(buf));
 	str = mongrid_status(str);
 	cxn_send(plyr->cxn, str);
 }
@@ -276,7 +276,7 @@ static pthread_t player_create_thread(struct player *plyr,
 
 static uint32_t load_config(void) {
 	char buf[128];
-	nstr_t str = config_load("config", nstr_make(buf, sizeof(buf), 0));
+	nstr_t str = config_load("config", nstr_init(buf, sizeof(buf)));
 	if (nstr_len(str)) {
 		nstr_t cmd = nstr_chop(str, RECORD_SEP);
 		nstr_t p1 = nstr_split(&cmd, UNIT_SEP);
@@ -293,7 +293,7 @@ static uint32_t load_config(void) {
 
 static void player_load_cmd(struct player *plyr, const char *fname) {
 	char buf[128];
-	nstr_t str = nstr_make(buf, sizeof(buf), 0);
+	nstr_t str = nstr_init(buf, sizeof(buf));
 	player_proc_cmds(plyr, config_load(fname, str), false);
 }
 

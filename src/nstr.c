@@ -18,7 +18,11 @@
 #include <string.h>
 #include "nstr.h"
 
-nstr_t nstr_empty(void) {
+/** Initialize an empty nstr.
+ *
+ * @return Empty nstr.
+ */
+nstr_t nstr_init_empty(void) {
 	nstr_t str;
 	str.buf = NULL;
 	str.buf_len = 0;
@@ -26,7 +30,28 @@ nstr_t nstr_empty(void) {
 	return str;
 }
 
-nstr_t nstr_make(char *buf, uint32_t buf_len, uint32_t len) {
+/** Initialize a new nstr.
+ *
+ * @param buf     [in] Buffer for nstr to own.
+ * @param buf_len [in] Length of nstr buffer.
+ * @return Initialized nstr.
+ */
+nstr_t nstr_init(char *buf, uint32_t buf_len) {
+	nstr_t str;
+	str.buf = buf;
+	str.buf_len = buf_len;
+	str.len = 0;
+	return str;
+}
+
+/** Initialize a new nstr with an existing buffer.
+ *
+ * @param buf     [in] Buffer for nstr to own.
+ * @param buf_len [in] Length of nstr buffer.
+ * @param len     [in] Length of data in buffer.
+ * @return Initialized nstr.
+ */
+nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len) {
 	nstr_t str;
 	str.buf = buf;
 	str.buf_len = buf_len;
@@ -40,7 +65,7 @@ static bool nstr_cpy(nstr_t *dst, nstr_t src) {
 }
 
 nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, nstr_t src) {
-	nstr_t dst = nstr_make(buf, buf_len, 0);
+	nstr_t dst = nstr_init(buf, buf_len);
 	nstr_cpy(&dst, src);
 	return dst;
 }
@@ -101,12 +126,12 @@ nstr_t nstr_split(nstr_t *str, char c) {
 		str->len -= j;
 	} else
 		str->len = 0;
-	return nstr_make(buf, i + 1, i);
+	return nstr_init_n(buf, i + 1, i);
 }
 
 nstr_t nstr_chop(nstr_t str, char c) {
 	uint32_t i = nstr_find(str, c);
-	return nstr_make(str.buf, i + 1, i);
+	return nstr_init_n(str.buf, i + 1, i);
 }
 
 bool nstr_cmp_z(nstr_t str, const char *buf) {
@@ -174,7 +199,7 @@ const char *nstr_z(nstr_t str) {
  */
 bool nstr_to_cstr(char *dst, size_t n, nstr_t src) {
 	bool trunc;
-	nstr_t tmp = nstr_make(dst, n, 0);
+	nstr_t tmp = nstr_init(dst, n);
 	trunc = nstr_cpy(&tmp, src);
 	nstr_z(tmp);
 	return trunc;

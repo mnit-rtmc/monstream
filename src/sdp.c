@@ -43,16 +43,16 @@ static bool sdp_data_check(nstr_t str) {
 void sdp_data_init(struct sdp_data *sdp, nstr_t loc) {
 	sdp->is_sdp = sdp_data_check(loc);
 	sdp->loc_hash = nstr_hash_fnv(loc);
-	sdp->cache = nstr_make(sdp->cache_buf, sizeof(sdp->cache_buf), 0);
-	sdp->fetch = nstr_make(sdp->fetch_buf, sizeof(sdp->fetch_buf), 0);
+	sdp->cache = nstr_init(sdp->cache_buf, sizeof(sdp->cache_buf));
+	sdp->fetch = nstr_init(sdp->fetch_buf, sizeof(sdp->fetch_buf));
 	sdp->loc = nstr_make_cpy(sdp->loc_buf, sizeof(sdp->loc_buf), loc);
-	sdp->udp = nstr_make(sdp->udp_buf, sizeof(sdp->udp_buf), 0);
-	sdp->sprops = nstr_make(sdp->sprop_buf, sizeof(sdp->sprop_buf), 0);
+	sdp->udp = nstr_init(sdp->udp_buf, sizeof(sdp->udp_buf));
+	sdp->sprops = nstr_init(sdp->sprop_buf, sizeof(sdp->sprop_buf));
 }
 
 static bool sdp_data_parse(struct sdp_data *sdp, nstr_t str) {
-	nstr_t udp = nstr_make(sdp->udp_buf, sizeof(sdp->udp_buf), 0);
-	nstr_t sprops = nstr_make(sdp->sprop_buf, sizeof(sdp->sprop_buf), 0);
+	nstr_t udp = nstr_init(sdp->udp_buf, sizeof(sdp->udp_buf));
+	nstr_t sprops = nstr_init(sdp->sprop_buf, sizeof(sdp->sprop_buf));
 	GstSDPMessage msg;
 	memset(&msg, 0, sizeof(msg));
 	if (gst_sdp_message_init(&msg) != GST_SDP_OK) {
@@ -120,7 +120,7 @@ bool sdp_data_cache(struct sdp_data *sdp) {
 static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
 	nstr_t *str = (nstr_t *) uptr;
 	size_t sz = size * nmemb;
-	nstr_t src = nstr_make(contents, sz, sz);
+	nstr_t src = nstr_init_n(contents, sz, sz);
 	nstr_cat(str, src);
 	return nstr_len(*str);
 }
@@ -139,7 +139,7 @@ static void sdp_data_get_http(struct sdp_data *sdp) {
 	rc = curl_easy_perform(ch);
 	if (rc != CURLE_OK) {
 		elog_err("curl error: %s\n", curl_easy_strerror(rc));
-		sdp->fetch = nstr_make(sdp->fetch_buf, sizeof(sdp->fetch_buf), 0);
+		sdp->fetch = nstr_init(sdp->fetch_buf, sizeof(sdp->fetch_buf));
 	}
 	curl_easy_cleanup(ch);
 }
