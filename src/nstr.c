@@ -59,17 +59,6 @@ nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len) {
 	return str;
 }
 
-static bool nstr_cpy(nstr_t *dst, nstr_t src) {
-	dst->len = 0;
-	return nstr_cat(dst, src);
-}
-
-nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, nstr_t src) {
-	nstr_t dst = nstr_init(buf, buf_len);
-	nstr_cpy(&dst, src);
-	return dst;
-}
-
 nstr_t nstr_dup(nstr_t o) {
 	nstr_t str;
 	str.buf = o.buf;
@@ -200,7 +189,7 @@ const char *nstr_z(nstr_t str) {
 bool nstr_to_cstr(char *dst, size_t n, nstr_t src) {
 	bool trunc;
 	nstr_t tmp = nstr_init(dst, n);
-	trunc = nstr_cpy(&tmp, src);
+	trunc = nstr_cat(&tmp, src);
 	nstr_z(tmp);
 	return trunc;
 }

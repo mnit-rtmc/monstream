@@ -14,7 +14,6 @@ typedef struct nstr nstr_t;
 nstr_t nstr_init_empty(void);
 nstr_t nstr_init(char *buf, uint32_t buf_len);
 nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len);
-nstr_t nstr_make_cpy(char *buf, uint32_t buf_len, nstr_t src);
 nstr_t nstr_dup(nstr_t o);
 uint32_t nstr_len(nstr_t str);
 bool nstr_cat(nstr_t *dst, nstr_t src);
