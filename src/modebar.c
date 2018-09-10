@@ -688,9 +688,9 @@ static gboolean do_modebar_set_text(gpointer data) {
 }
 
 void modebar_display(struct modebar *mbar, nstr_t mon, nstr_t cam, nstr_t seq) {
-	nstr_wrap(mbar->mon, sizeof(mbar->mon), mon);
-	nstr_wrap(mbar->cam, sizeof(mbar->cam), cam);
-	nstr_wrap(mbar->seq, sizeof(mbar->seq), seq);
+	nstr_to_cstr(mbar->mon, sizeof(mbar->mon), mon);
+	nstr_to_cstr(mbar->cam, sizeof(mbar->cam), cam);
+	nstr_to_cstr(mbar->seq, sizeof(mbar->seq), seq);
 	g_timeout_add(0, do_modebar_set_text, mbar);
 }
 

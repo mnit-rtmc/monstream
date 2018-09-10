@@ -77,7 +77,7 @@ static const char *moncell_get_cam_id(const struct moncell *mc) {
 }
 
 static void moncell_set_description(struct moncell *mc, nstr_t desc) {
-	nstr_wrap(mc->description, sizeof(mc->description), desc);
+	nstr_to_cstr(mc->description, sizeof(mc->description), desc);
 }
 
 static const char MONCELL_CSS[] =
@@ -326,12 +326,12 @@ static void moncell_set_mon(struct moncell *mc, nstr_t mid, int32_t accent,
 	bool aspect, uint32_t font_sz, nstr_t crop, uint32_t hgap,
 	uint32_t vgap, nstr_t extra)
 {
-	nstr_wrap(mc->mid, sizeof(mc->mid), mid);
+	nstr_to_cstr(mc->mid, sizeof(mc->mid), mid);
 	mc->accent = accent;
 	stream_set_aspect(&mc->stream, aspect);
 	stream_set_font_size(&mc->stream, font_sz);
 	stream_set_crop(&mc->stream, crop, hgap, vgap);
-	nstr_wrap(mc->extra, sizeof(mc->extra), extra);
+	nstr_to_cstr(mc->extra, sizeof(mc->extra), extra);
 	mc->font_sz = font_sz;
 	if (grid.window)
 		g_timeout_add(0, do_update_title, mc);

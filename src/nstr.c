@@ -83,16 +83,6 @@ bool nstr_cat_z(nstr_t *dst, const char *src) {
 	return (src[n] != '\0');
 }
 
-const char *nstr_z(nstr_t str) {
-	uint32_t n = (str.len < str.buf_len) ? str.len : str.buf_len - 1;
-	// Need to check in case buf_len is zero
-	if (n < str.buf_len) {
-		str.buf[n] = '\0';
-		return str.buf;
-	} else
-		return "";
-}
-
 static uint32_t nstr_find(nstr_t str, char c) {
 	for (uint32_t i = 0; i < str.len; i++) {
 		if (str.buf[i] == c)
@@ -160,17 +150,39 @@ bool nstr_contains(nstr_t str, const char *buf) {
 	return false;
 }
 
-bool nstr_wrap(char *buf, size_t n, nstr_t str) {
+/** Get nstr as a C string (zero-terminated).
+ *
+ * @param str String to retrieve.
+ * @return C string pointer.
+ */
+const char *nstr_z(nstr_t str) {
+	uint32_t n = (str.len < str.buf_len) ? str.len : str.buf_len - 1;
+	// Need to check in case buf_len is zero
+	if (n < str.buf_len) {
+		str.buf[n] = '\0';
+		return str.buf;
+	} else
+		return "";
+}
+
+/** Copy an nstr to a C string (zero-terminated).
+ *
+ * @param dst [in,out] Destination buffer.
+ * @param n   [in]     Length of destination buffer.
+ * @param src [in]     String to copy.
+ * @return true if string was truncated.
+ */
+bool nstr_to_cstr(char *dst, size_t n, nstr_t src) {
 	bool trunc;
-	nstr_t tmp = nstr_make(buf, n, 0);
-	trunc = nstr_cpy(&tmp, str);
+	nstr_t tmp = nstr_make(dst, n, 0);
+	trunc = nstr_cpy(&tmp, src);
 	nstr_z(tmp);
 	return trunc;
 }
 
 int32_t nstr_parse_u32(nstr_t str) {
 	char buf[16];
-	if (!nstr_wrap(buf, sizeof(buf), str))
+	if (!nstr_to_cstr(buf, sizeof(buf), str))
 		return atoi(buf);
 	else
 		return -1;

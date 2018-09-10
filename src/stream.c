@@ -537,12 +537,12 @@ void stream_set_aspect(struct stream *st, bool aspect) {
 void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
 	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
-	nstr_wrap(st->cam_id, sizeof(st->cam_id), cam_id);
-	nstr_wrap(st->location, sizeof(st->location), loc);
-	nstr_wrap(st->description, sizeof(st->description), desc);
-	nstr_wrap(st->encoding, sizeof(st->encoding), encoding);
+	nstr_to_cstr(st->cam_id, sizeof(st->cam_id), cam_id);
+	nstr_to_cstr(st->location, sizeof(st->location), loc);
+	nstr_to_cstr(st->description, sizeof(st->description), desc);
+	nstr_to_cstr(st->encoding, sizeof(st->encoding), encoding);
 	st->latency = latency;
-	nstr_wrap(st->sprops, sizeof(st->sprops), sprops);
+	nstr_to_cstr(st->sprops, sizeof(st->sprops), sprops);
 }
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
@@ -552,7 +552,7 @@ void stream_set_font_size(struct stream *st, uint32_t sz) {
 void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
 	uint32_t vgap)
 {
-	nstr_wrap(st->crop, sizeof(st->crop), crop);
+	nstr_to_cstr(st->crop, sizeof(st->crop), crop);
 	st->hgap = hgap;
 	st->vgap = vgap;
 }
