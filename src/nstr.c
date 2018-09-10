@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2018  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -12,7 +12,6 @@
  * GNU General Public License for more details.
  */
 
-#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,11 +27,10 @@ nstr_t nstr_empty(void) {
 }
 
 nstr_t nstr_make(char *buf, uint32_t buf_len, uint32_t len) {
-	assert(buf_len >= len);
 	nstr_t str;
 	str.buf = buf;
 	str.buf_len = buf_len;
-	str.len = len;
+	str.len = (len < buf_len) ? len : buf_len;
 	return str;
 }
 
@@ -58,9 +56,10 @@ bool nstr_cat(nstr_t *dst, nstr_t src) {
 	uint32_t len = dst->len + src.len;
 	bool trunc = dst->buf_len <= len;
 	uint32_t n = (trunc)
-	           ? (dst->buf_len - 1 - dst->len)
+	           ? (dst->buf_len - dst->len)
 	           : src.len;
-	memcpy(dst->buf + dst->len, src.buf, n);
+	if (n > 0)
+		memcpy(dst->buf + dst->len, src.buf, n);
 	dst->len += n;
 	return trunc;
 }
@@ -85,10 +84,13 @@ bool nstr_cat_z(nstr_t *dst, const char *src) {
 }
 
 const char *nstr_z(nstr_t str) {
-	int n = (str.len < str.buf_len) ? str.len : str.buf_len;
-	assert(n < str.buf_len);
-	str.buf[n] = '\0';
-	return str.buf;
+	uint32_t n = (str.len < str.buf_len) ? str.len : str.buf_len - 1;
+	// Need to check in case buf_len is zero
+	if (n < str.buf_len) {
+		str.buf[n] = '\0';
+		return str.buf;
+	} else
+		return "";
 }
 
 static uint32_t nstr_find(nstr_t str, char c) {
