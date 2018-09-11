@@ -207,12 +207,12 @@ static void *cmd_thread(void *arg) {
 	return NULL;
 }
 
-static void player_send_status(struct player *plyr) {
+static bool player_send_status(struct player *plyr) {
 	char buf[256];
 
 	nstr_t str = nstr_init(buf, sizeof(buf));
 	str = mongrid_status(str);
-	cxn_send(plyr->cxn, str);
+	return cxn_send(plyr->cxn, str);
 }
 
 static void sleep_for(time_t sec, long nano) {
@@ -226,10 +226,10 @@ static void *status_thread(void *arg) {
 	struct player *plyr = arg;
 
 	while (true) {
-		bool online = cxn_established(plyr->cxn);
+		bool online = cxn_established(plyr->cxn)
+		           && player_send_status(plyr);
 		mongrid_set_online(online);
 		if (online) {
-			player_send_status(plyr);
 			if (mongrid_mon_selected())
 				sleep_for(0, 333333333);
 			else

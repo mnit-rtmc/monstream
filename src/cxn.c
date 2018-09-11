@@ -12,7 +12,6 @@
  * GNU General Public License for more details.
  */
 
-#include <assert.h>
 #include <errno.h>
 #include <netdb.h>		/* for socket stuff */
 #include <stdbool.h>
@@ -173,21 +172,23 @@ static void cxn_disconnect(struct cxn *cxn, int fd) {
 		elog_err("disconnect: %s\n", strerror(errno));
 }
 
-void cxn_send(struct cxn *cxn, nstr_t str) {
+bool cxn_send(struct cxn *cxn, nstr_t str) {
 	struct sockaddr_storage addr;
 	socklen_t               len;
 	int                     fd;
-	ssize_t                 n;
 
-	assert(cxn_established(cxn));
 	fd = cxn_get_fd(cxn);
 	len = cxn_get_addr(cxn, &addr);
-	n = sendto(fd, str.buf, str.len, 0, (struct sockaddr *) &addr, len);
-	if (n < 0) {
+	if (len > 0) {
+		ssize_t n = sendto(fd, str.buf, str.len, 0,
+			(struct sockaddr *) &addr, len);
+		if (n >= 0)
+			return true;
 		elog_err("sendto: %s\n", strerror(errno));
 		cxn_log(cxn, "send error");
 		cxn_disconnect(cxn, fd);
 	}
+	return false;
 }
 
 static void cxn_connect(struct cxn *cxn, int fd, struct sockaddr_storage *addr,
