@@ -90,7 +90,7 @@ bool nstr_cat_z(nstr_t *dst, const char *src) {
 	uint32_t len = dst->len;
 	uint32_t n = dst->buf_len - len;
 	for (uint32_t i = 0; i < n; i++) {
-		if (src[i] == '\0') {
+		if ('\0' == src[i]) {
 			dst->len += i;
 			return false;
 		}
@@ -98,6 +98,22 @@ bool nstr_cat_z(nstr_t *dst, const char *src) {
 	}
 	dst->len = dst->buf_len;
 	return (src[n] != '\0');
+}
+
+/** Append a char to an nstr.
+ *
+ * @param dst nstr to append to.
+ * @param c Character to append.
+ * @return true if string was truncated.
+ */
+bool nstr_cat_c(nstr_t *dst, char c) {
+	uint32_t len = dst->len;
+	if (dst->buf_len > len) {
+		dst->buf[len] = c;
+		dst->len++;
+		return false;
+	} else
+		return true;
 }
 
 static uint32_t nstr_find(nstr_t str, char c) {

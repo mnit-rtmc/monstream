@@ -532,52 +532,56 @@ static const char RECORD_SEP = '\x1E';
 static const char UNIT_SEP = '\x1F';
 
 static nstr_t modebar_switch(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "switch%c%s%c%s%c", UNIT_SEP, mbar->mon,
-		UNIT_SEP, mbar->cam_req, RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "switch");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->cam_req);
+	nstr_cat_c(&str, RECORD_SEP);
 	memset(mbar->cam_req, 0, sizeof(mbar->cam_req));
 	return str;
 }
 
 static nstr_t modebar_prev(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "previous%c%s%c", UNIT_SEP, mbar->mon,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "previous");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, RECORD_SEP);
 	mbar->btn_req = REQ_NONE;
 	return str;
 }
 
 static nstr_t modebar_next(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "next%c%s%c", UNIT_SEP, mbar->mon,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "next");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, RECORD_SEP);
 	mbar->btn_req = REQ_NONE;
 	return str;
 }
 
 static nstr_t modebar_lens(struct modebar *mbar, nstr_t str, const char *cmd) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "lens%c%s%c%s%c%s%c",
-		UNIT_SEP, mbar->mon,
-		UNIT_SEP, mbar->cam,
-		UNIT_SEP, cmd,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "lens");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->cam);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, cmd);
+	nstr_cat_c(&str, RECORD_SEP);
 	mbar->btn_req = REQ_NONE;
 	return str;
 }
 
 static nstr_t modebar_menu(struct modebar *mbar, nstr_t str, const char *cmd) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "menu%c%s%c%s%c%s%c",
-		UNIT_SEP, mbar->mon,
-		UNIT_SEP, mbar->cam,
-		UNIT_SEP, cmd,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "menu");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->cam);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, cmd);
+	nstr_cat_c(&str, RECORD_SEP);
 	mbar->btn_req = REQ_NONE;
 	return str;
 }
@@ -614,23 +618,27 @@ static nstr_t modebar_button(struct modebar *mbar, nstr_t str) {
 }
 
 static nstr_t modebar_sequence(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "sequence%c%s%c%s%c", UNIT_SEP, mbar->mon,
-		UNIT_SEP, mbar->seq_req, RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "sequence");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->seq_req);
+	nstr_cat_c(&str, RECORD_SEP);
 	memset(mbar->seq_req, 0, sizeof(mbar->seq_req));
 	return str;
 }
 
 static nstr_t modebar_preset(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "preset%c%s%c%s%c%s%c%s%c",
-		UNIT_SEP, mbar->mon,
-		UNIT_SEP, mbar->cam,
-		UNIT_SEP, "recall",
-		UNIT_SEP, mbar->preset_req,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "preset");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->cam);
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, "recall");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->preset_req);
+	nstr_cat_c(&str, RECORD_SEP);
 	memset(mbar->preset_req, 0, sizeof(mbar->preset_req));
 	return str;
 }
@@ -654,10 +662,10 @@ static nstr_t modebar_ptz(struct modebar *mbar, nstr_t str) {
 }
 
 static nstr_t modebar_query(struct modebar *mbar, nstr_t str) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "query%c%s%c", UNIT_SEP, mbar->mon,
-		RECORD_SEP);
-	nstr_cat_z(&str, buf);
+	nstr_cat_z(&str, "query");
+	nstr_cat_c(&str, UNIT_SEP);
+	nstr_cat_z(&str, mbar->mon);
+	nstr_cat_c(&str, RECORD_SEP);
 	return str;
 }
 

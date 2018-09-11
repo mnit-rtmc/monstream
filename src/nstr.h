@@ -17,6 +17,7 @@ nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len);
 uint32_t nstr_len(nstr_t str);
 bool nstr_cat(nstr_t *dst, nstr_t src);
 bool nstr_cat_z(nstr_t *dst, const char *src);
+bool nstr_cat_c(nstr_t *dst, char c);
 nstr_t nstr_split(nstr_t *str, char c);
 nstr_t nstr_chop(nstr_t str, char c);
 bool nstr_cmp_z(nstr_t str, const char *buf);
