@@ -80,10 +80,16 @@ bool nstr_cat(nstr_t *dst, nstr_t src) {
 	return trunc;
 }
 
+/** Append a C string (zero-terminated) to an nstr.
+ *
+ * @param dst nstr to append to.
+ * @param src C string to append.
+ * @return true if string was truncated.
+ */
 bool nstr_cat_z(nstr_t *dst, const char *src) {
-	int len = dst->len;
-	int n = dst->buf_len - len;
-	for (int i = 0; i < n; i++) {
+	uint32_t len = dst->len;
+	uint32_t n = dst->buf_len - len;
+	for (uint32_t i = 0; i < n; i++) {
 		if (src[i] == '\0') {
 			dst->len += i;
 			return false;
@@ -121,7 +127,7 @@ nstr_t nstr_chop(nstr_t str, char c) {
 }
 
 bool nstr_cmp_z(nstr_t str, const char *buf) {
-	for (int i = 0; i < str.len; i++) {
+	for (uint32_t i = 0; i < str.len; i++) {
 		if (str.buf[i] != buf[i])
 			return false;
 	}
@@ -130,7 +136,7 @@ bool nstr_cmp_z(nstr_t str, const char *buf) {
 
 bool nstr_equals(nstr_t a, nstr_t b) {
 	if (a.len == b.len) {
-		for (int i = 0; i < a.len; i++) {
+		for (uint32_t i = 0; i < a.len; i++) {
 			if (a.buf[i] != b.buf[i])
 				return false;
 		}
@@ -140,7 +146,7 @@ bool nstr_equals(nstr_t a, nstr_t b) {
 }
 
 bool nstr_starts_with(nstr_t str, const char *buf) {
-	for (int i = 0; i < str.len; i++) {
+	for (uint32_t i = 0; i < str.len; i++) {
 		if ('\0' == buf[i])
 			return true;
 		if (str.buf[i] != buf[i])
@@ -214,7 +220,7 @@ int32_t nstr_parse_hex(nstr_t hex) {
 	int32_t v = 0;
 	if (hex.len > 8)
 		return -1;
-	for (int i = 0; i < hex.len; i++) {
+	for (uint32_t i = 0; i < hex.len; i++) {
 		int32_t d = parse_digit(hex.buf[i]);
 		if (d < 0)
 			return -1;
@@ -228,8 +234,7 @@ uint64_t nstr_hash_fnv(nstr_t str) {
 	const void *key = str.buf;
 	const uint8_t *p = key;
 	uint64_t h = 14695981039346656037UL;
-	int i;
-	for (i = 0; i < str.len; i++) {
+	for (uint32_t i = 0; i < str.len; i++) {
 		h = (h * 1099511628211UL) ^ p[i];
 	}
 	return h;
