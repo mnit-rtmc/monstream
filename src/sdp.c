@@ -34,6 +34,7 @@
  */
 
 static const int64_t TIMEOUT_SEC = 5L;
+static const long HTTP_OK = 200;
 
 static bool sdp_data_check(nstr_t str) {
 	return nstr_starts_with(str, "http://")
@@ -128,9 +129,10 @@ static size_t sdp_write(void *contents, size_t size, size_t nmemb, void *uptr) {
 
 static void sdp_data_get_http(struct sdp_data *sdp) {
 	CURLcode rc;
+	long resp;
 
 	CURL *ch = curl_easy_init();
-	curl_easy_setopt(ch, CURLOPT_URL, sdp->loc_buf);
+	curl_easy_setopt(ch, CURLOPT_URL, nstr_z(sdp->loc));
 	curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, TIMEOUT_SEC);
 	curl_easy_setopt(ch, CURLOPT_TIMEOUT, TIMEOUT_SEC);
@@ -140,6 +142,11 @@ static void sdp_data_get_http(struct sdp_data *sdp) {
 	rc = curl_easy_perform(ch);
 	if (rc != CURLE_OK) {
 		elog_err("curl error: %s\n", curl_easy_strerror(rc));
+		sdp->fetch = nstr_init(sdp->fetch_buf, sizeof(sdp->fetch_buf));
+	}
+	curl_easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &resp);
+	if (HTTP_OK != resp) {
+		elog_err("HTTP error %ld from %s\n", resp, nstr_z(sdp->loc));
 		sdp->fetch = nstr_init(sdp->fetch_buf, sizeof(sdp->fetch_buf));
 	}
 	curl_easy_cleanup(ch);
