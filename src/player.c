@@ -98,7 +98,9 @@ static void player_play(struct player *plyr, nstr_t cmd, bool store) {
 			loc = sdp.udp;
 			sprops = sdp.sprops;
 		}
-		if (!plyr->configuring) {
+		if (plyr->configuring) {
+			elog_err("cannot play while in config mode\n");
+		} else {
 			mongrid_play_stream(mon, cam_id, loc, desc, encoding,
 				latency, sprops);
 		}
