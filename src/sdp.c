@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018  Minnesota Department of Transportation
+ * Copyright (C) 2018-2019  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -138,7 +138,7 @@ static void sdp_data_get_http(struct sdp_data *sdp) {
 	curl_easy_setopt(ch, CURLOPT_TIMEOUT, TIMEOUT_SEC);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, sdp_write);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, &sdp->fetch);
-	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, 0);
+	curl_easy_setopt(ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC|CURLAUTH_DIGEST);
 	rc = curl_easy_perform(ch);
 	if (rc != CURLE_OK) {
 		elog_err("curl error: %s\n", curl_easy_strerror(rc));
