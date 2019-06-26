@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018  Minnesota Department of Transportation
+ * Copyright (C) 2017-2019  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -171,6 +171,7 @@ static const char *stream_location_http(const struct stream *st) {
 	{
 		return st->location;
 	} else {
+		elog_err("Unsupported encoding for HTTP: %s\n", st->encoding);
 		/* Use IP address in TEST-NET-1 range to ensure the stream
 		 * will timeout quickly */
 		return "http://192.0.2.1/";
