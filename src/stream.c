@@ -506,8 +506,9 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 	st->handle = 0;
 	st->aspect = FALSE;
 	st->pipeline = gst_pipeline_new(name);
-	st->bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
-	gst_bus_add_watch(st->bus, bus_cb, st);
+	GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(st->pipeline));
+	st->watch = gst_bus_add_watch(bus, bus_cb, st);
+	gst_object_unref(bus);
 	memset(st->elem, 0, sizeof(st->elem));
 	st->jitter = NULL;
 	st->sink = NULL;
@@ -521,8 +522,8 @@ void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
 
 void stream_destroy(struct stream *st) {
 	stream_stop_pipeline(st);
-	gst_bus_remove_watch(st->bus);
-	g_object_unref(st->pipeline);
+	gst_object_unref(st->pipeline);
+	g_source_remove(st->watch);
 	st->pipeline = NULL;
 	st->lock = NULL;
 }
@@ -569,8 +570,11 @@ static void stream_check_sink(struct stream *st) {
 		gst_sample_unref(s);
 		if (t == st->last_pts) {
 			elog_err("PTS stuck at %lu; posting EOS\n", t);
-			gst_bus_post(st->bus, gst_message_new_eos(
+			GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(
+			                                   st->pipeline));
+			gst_bus_post(bus, gst_message_new_eos(
 			             GST_OBJECT_CAST(st->sink)));
+			gst_object_unref(bus);
 		}
 		st->last_pts = t;
 	}

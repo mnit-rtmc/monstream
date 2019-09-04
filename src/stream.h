@@ -23,7 +23,7 @@ struct stream {
 	uint32_t	hgap;
 	uint32_t	vgap;
 	GstElement	*pipeline;
-	GstBus		*bus;
+	guint           watch;
 	GstElement	*elem[MAX_ELEMS];
 	GstElement	*jitter;
 	GstElement	*sink;
