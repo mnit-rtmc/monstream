@@ -17,7 +17,7 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#define VERSION "1.8"
+#define VERSION "1.9"
 #define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2019  MnDOT\n"
 
 void run_player(bool gui, bool stats, const char *port);
