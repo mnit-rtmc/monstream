@@ -105,15 +105,6 @@ static void stream_add_text(struct stream *st) {
 	stream_add(st, txt);
 }
 
-static void stream_add_videobox(struct stream *st) {
-	GstElement *vbx = gst_element_factory_make("videobox", "vbox");
-	g_object_set(G_OBJECT(vbx), "top", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "bottom", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "left", -1, NULL);
-	g_object_set(G_OBJECT(vbx), "right", -1, NULL);
-	stream_add(st, vbx);
-}
-
 static void stream_add_queue(struct stream *st) {
 	GstElement *que = gst_element_factory_make("queue", NULL);
 	g_object_set(G_OBJECT(que), "max-size-time", 650000000, NULL);
@@ -252,7 +243,6 @@ static void stream_add_later_elements(struct stream *st) {
 	if (stream_has_description(st) && strcmp("MJPEG", st->encoding) != 0) {
 		stream_add_text(st);
 	}
-	stream_add_videobox(st);
 	if (strcmp("H264", st->encoding) == 0) {
 		stream_add_h264(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
