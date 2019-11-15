@@ -114,7 +114,6 @@ static void stream_add_queue(struct stream *st) {
 static void stream_add_jitter(struct stream *st) {
 	GstElement *jtr = gst_element_factory_make("rtpjitterbuffer", NULL);
 	g_object_set(G_OBJECT(jtr), "latency", st->latency, NULL);
-	g_object_set(G_OBJECT(jtr), "drop-on-latency", TRUE, NULL);
 	g_object_set(G_OBJECT(jtr), "max-dropout-time", 1500, NULL);
 	stream_add(st, jtr);
 	st->jitter = jtr;
