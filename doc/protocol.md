@@ -24,6 +24,11 @@ Messages are separated by ASCII record separator (30).
 9. Vertical gap (20 -> 0.2%)
 10. Extra monitor label (full-screen)
 
+### Sink
+
+1. sink
+2. Sink name (XVIMAGE or VAAPI)
+
 ### Play
 
 1. play

@@ -12,6 +12,7 @@ struct stream {
 	struct lock	*lock;
 	guintptr	handle;
 	gboolean	aspect;
+	char		sink_name[8];
 	char		crop[6];         /* crop code */
 	char		cam_id[20];      /* camera ID */
 	char		location[128];
@@ -35,7 +36,8 @@ struct stream {
 	void		(*ack_started)	(struct stream *st);
 };
 
-void stream_init(struct stream *st, uint32_t idx, struct lock *lock);
+void stream_init(struct stream *st, uint32_t idx, struct lock *lock,
+	nstr_t sink_name);
 void stream_destroy(struct stream *st);
 void stream_set_handle(struct stream *st, guintptr handle);
 void stream_set_aspect(struct stream *st, bool aspect);

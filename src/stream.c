@@ -73,18 +73,27 @@ static void stream_add(struct stream *st, GstElement *elem) {
 		elog_err("Element not added to pipeline\n");
 }
 
-static GstElement* stream_create_xvimagesink(struct stream *st) {
-	GstElement *sink = gst_element_factory_make("xvimagesink", NULL);
-	GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
-	gst_video_overlay_set_window_handle(overlay, st->handle);
-	g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect, NULL);
-	st->sink = sink;
+static GstElement *stream_create_sink(const struct stream *st) {
+	return (strcmp("VAAPI", st->sink_name) == 0)
+	      ? gst_element_factory_make("vaapisink", NULL)
+	      : gst_element_factory_make("xvimagesink", NULL);
+}
+
+static GstElement *stream_create_real_sink(struct stream *st) {
+	GstElement *sink = stream_create_sink(st);
+	if (sink != NULL) {
+		GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
+		gst_video_overlay_set_window_handle(overlay, st->handle);
+		g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect,
+			NULL);
+		st->sink = sink;
+	}
 	return sink;
 }
 
 static void stream_add_sink(struct stream *st) {
 	GstElement *sink = (st->handle)
-	      ? stream_create_xvimagesink(st)
+	      ? stream_create_real_sink(st)
 	      : gst_element_factory_make("fakesink", NULL);
 	stream_add(st, sink);
 }
@@ -222,10 +231,18 @@ static void stream_add_mpeg4(struct stream *st) {
 	stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
 }
 
+static GstElement *stream_create_h264dec(const struct stream *st) {
+	if (strcmp("VAAPI", st->sink_name) == 0) {
+		return gst_element_factory_make("vaapih264dec", NULL);
+	} else {
+		GstElement *dec = gst_element_factory_make("avdec_h264", NULL);
+		g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
+		return dec;
+	}
+}
+
 static void stream_add_h264(struct stream *st) {
-	GstElement *dec = gst_element_factory_make("avdec_h264", NULL);
-	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
-	stream_add(st, dec);
+	stream_add(st, stream_create_h264dec(st));
 	stream_add(st, gst_element_factory_make("rtph264depay", NULL));
 }
 
@@ -477,11 +494,15 @@ static gboolean bus_cb(GstBus *bus, GstMessage *msg, gpointer data) {
 	return TRUE;
 }
 
-void stream_init(struct stream *st, uint32_t idx, struct lock *lock) {
+void stream_init(struct stream *st, uint32_t idx, struct lock *lock,
+	nstr_t sink_name)
+{
 	char name[8];
 
 	st->lock = lock;
 	snprintf(name, sizeof(name), "m%d", idx);
+	memset(st->sink_name, 0, sizeof(st->sink_name));
+	nstr_to_cstr(st->sink_name, sizeof(st->sink_name), sink_name);
 	memset(st->crop, 0, sizeof(st->crop));
 	memset(st->cam_id, 0, sizeof(st->cam_id));
 	memset(st->location, 0, sizeof(st->location));

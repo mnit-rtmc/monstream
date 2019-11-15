@@ -171,6 +171,14 @@ static void player_config(struct player *plyr, nstr_t cmd) {
 		elog_err("Invalid config: %s\n", nstr_z(cmd));
 }
 
+static void player_sink(struct player *plyr, nstr_t cmd) {
+	nstr_t str  = cmd;
+	nstr_t sink = nstr_split(&str, UNIT_SEP);	// "sink"
+	assert(nstr_cmp_z(sink, "sink"));
+	elog_cmd(cmd);
+	config_store("sink", cmd);
+}
+
 static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
 	nstr_t p1 = nstr_chop(cmd, UNIT_SEP);
 	if (nstr_cmp_z(p1, "display"))
@@ -183,6 +191,8 @@ static void player_proc_cmd(struct player *plyr, nstr_t cmd, bool store) {
 		player_monitor(plyr, cmd, store);
 	else if (nstr_cmp_z(p1, "config"))
 		player_config(plyr, cmd);
+	else if (nstr_cmp_z(p1, "sink"))
+		player_sink(plyr, cmd);
 	else
 		elog_err("Invalid command: %s\n", nstr_z(cmd));
 }
@@ -293,6 +303,20 @@ static uint32_t load_config(void) {
 	return 1;
 }
 
+static nstr_t load_sink(nstr_t str) {
+	str = config_load("sink", str);
+	if (nstr_len(str)) {
+		nstr_t cmd = nstr_chop(str, RECORD_SEP);
+		nstr_t p1 = nstr_split(&cmd, UNIT_SEP);
+		if (nstr_cmp_z(p1, "sink")) {
+			elog_cmd(str);
+			return nstr_split(&cmd, UNIT_SEP);
+		} else
+			elog_err("Invalid command: %s\n", nstr_z(cmd));
+	}
+	return nstr_init_empty();
+}
+
 static void player_load_cmd(struct player *plyr, const char *fname) {
 	char buf[128];
 	nstr_t str = nstr_init(buf, sizeof(buf));
@@ -336,7 +360,10 @@ void run_player(bool gui, bool stats, const char *port) {
 	player_install_handler(&plyr);
 	while (plyr.cmd_tid && plyr.stat_tid && plyr.joy_tid) {
 		uint32_t mon = load_config();
-		if (mongrid_init(mon, plyr.stat_tid))
+		char buf[16];
+		nstr_t str = nstr_init(buf, sizeof(buf));
+		nstr_t sink_name = load_sink(str);
+		if (mongrid_init(mon, plyr.stat_tid, sink_name))
 			break;
 		player_load_cmds(&plyr, mon);
 		mongrid_run();

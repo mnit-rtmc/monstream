@@ -282,9 +282,9 @@ static void moncell_init_gtk(struct moncell *mc) {
 	gtk_box_pack_end(GTK_BOX(mc->box), mc->title, FALSE, FALSE, 0);
 }
 
-static void moncell_init(struct moncell *mc, uint32_t idx) {
+static void moncell_init(struct moncell *mc, uint32_t idx, nstr_t sink_name) {
 	memset(mc, 0, sizeof(struct moncell));
-	stream_init(&mc->stream, idx, &grid.lock);
+	stream_init(&mc->stream, idx, &grid.lock, sink_name);
 	mc->stream.do_stop = moncell_stop;
 	mc->font_sz = 32;
 	mc->started = FALSE;
@@ -465,7 +465,7 @@ static void mongrid_init_gtk(uint32_t n_cells) {
 	mongrid_set_handles();
 }
 
-int32_t mongrid_init(uint32_t num, pthread_t tid) {
+int32_t mongrid_init(uint32_t num, pthread_t tid, nstr_t sink_name) {
 	lock_acquire(&grid.lock, __func__);
 	if (num > 16) {
 		grid.n_cells = 0;
@@ -475,7 +475,7 @@ int32_t mongrid_init(uint32_t num, pthread_t tid) {
 	grid.n_cells = get_rows(num) * get_cols(num);
 	grid.cells = calloc(grid.n_cells, sizeof(struct moncell));
 	for (uint32_t n = 0; n < grid.n_cells; n++)
-		moncell_init(grid.cells + n, n);
+		moncell_init(grid.cells + n, n, sink_name);
 	if (grid.window) {
 		mongrid_init_gtk(grid.n_cells);
 		modebar_set_tid(grid.mbar, tid);
