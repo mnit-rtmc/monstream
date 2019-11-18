@@ -18,7 +18,7 @@ $(BUILD)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(TARGET): $(SRC)/main.c $(BUILD) $(OBJS)
-	$(CC) -o $(TARGET) $(CFLAGS) $(LIBS) $(OBJS) $<
+	$(CC) -o $(TARGET) $(CFLAGS) $< $(LIBS) $(OBJS)
 
 clean:
 	rm -rf $(BUILD) $(TARGET)
