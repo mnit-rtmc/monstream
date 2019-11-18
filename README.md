@@ -21,5 +21,15 @@ dnf install gtk3-devel gstreamer1-devel gstreamer1-plugins-base-devel libcurl-de
 
 To build MonStream, run `make` in the repository root.
 
+### Configuration
+
 The `/var/lib/monstream` directory is used for caching data.  Create it and give
 the monstream user write access.
+
+These files are managed automatically and are not meant to be edited:
+
+* `config` - Number of monitors to display in grid
+* `sink` - Gstreamer sink element for display
+* `monitor.0` .. `monitor.n` - Parameters for each monitor
+* `play.0` .. `play.n` - Stream information for each monitor
+* `cache` - Directory containing SDP files for known streams
