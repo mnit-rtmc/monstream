@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018  Minnesota Department of Transportation
+ * Copyright (C) 2017-2019  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -139,7 +139,6 @@ static void moncell_update_title(struct moncell *mc) {
 }
 
 static void moncell_update_accent_title(struct moncell *mc) {
-	mc->failed = !mc->started;
 	moncell_set_accent(mc);
 	moncell_update_title(mc);
 }
@@ -224,12 +223,14 @@ static void moncell_stop_stream(struct moncell *mc, guint delay) {
 static void moncell_stop(struct stream *st) {
 	/* Cast requires stream is first member of struct */
 	struct moncell *mc = (struct moncell *) st;
+	mc->failed = mc->started;
 	moncell_stop_stream(mc, 1000);
 }
 
 static void moncell_ack_started(struct stream *st) {
 	/* Cast requires stream is first member of struct */
 	struct moncell *mc = (struct moncell *) st;
+	mc->failed = FALSE;
 	g_timeout_add(0, do_update_title, mc);
 }
 
@@ -288,7 +289,7 @@ static void moncell_init(struct moncell *mc, uint32_t idx, nstr_t sink_name) {
 	mc->stream.do_stop = moncell_stop;
 	mc->font_sz = 32;
 	mc->started = FALSE;
-	mc->failed = TRUE;
+	mc->failed = FALSE;
 	if (grid.window)
 		moncell_init_gtk(mc);
 }
@@ -316,6 +317,7 @@ static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
 	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
 	nstr_t d = moncell_has_title(mc) ? nstr_init_empty() : desc;
+	mc->failed = FALSE;
 	moncell_set_description(mc, desc);
 	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency, sprops);
 	/* Stopping the stream will trigger a restart */
