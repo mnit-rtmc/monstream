@@ -208,6 +208,13 @@ static void stream_add_src_rtsp(struct stream *st) {
 	stream_add(st, src);
 }
 
+static bool stream_has_crop(const struct stream *st) {
+	return st->crop[0] != 'A'
+	    || st->crop[1] != 'A'
+	    || st->crop[2] != 'A'
+	    || st->crop[3] != 'A';
+}
+
 static bool stream_has_description(const struct stream *st) {
 	return st->description[0] != '\0';
 }
@@ -259,6 +266,8 @@ static void stream_add_later_elements(struct stream *st) {
 	if (stream_has_description(st) && strcmp("MJPEG", st->encoding) != 0) {
 		stream_add_text(st);
 	}
+	if (stream_has_crop(st))
+		stream_add(st, gst_element_factory_make("videobox", "vbox"));
 	if (strcmp("H264", st->encoding) == 0) {
 		stream_add_h264(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
