@@ -19,7 +19,7 @@ Messages are separated by ASCII record separator (30).
 5. Force-aspect-ratio (0 or 1)
 6. Font size (pt)
 7. Four-letter crop code (ABAB -> upper-left quad).
-   Horizontal index, span, vertical index, span
+   Horizontal index, horizontal span, vertical index, vertical span
 8. Horizontal gap (1 -> 0.01%)
 9. Vertical gap (20 -> 0.2%)
 10. Extra monitor label (full-screen)

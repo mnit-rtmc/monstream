@@ -208,11 +208,68 @@ static void stream_add_src_rtsp(struct stream *st) {
 	stream_add(st, src);
 }
 
+/** Set crop parameters */
+void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
+	uint32_t vgap)
+{
+	nstr_to_cstr(st->crop, sizeof(st->crop), crop);
+	st->hgap = hgap;
+	st->vgap = vgap;
+}
+
+/** Check if a crop is valid.
+ * @param num Window fraction numerator, 0 to 7.
+ * @param den Window fraction denominator, 1 to 8. */
+static bool crop_valid(int num, int den) {
+	return num >= 0 && num < den && den <= 8;
+}
+
+/** Check if crop is configured */
 static bool stream_has_crop(const struct stream *st) {
-	return st->crop[0] != 'A'
-	    || st->crop[1] != 'A'
-	    || st->crop[2] != 'A'
-	    || st->crop[3] != 'A';
+	return crop_valid(st->crop[0] - 'A', st->crop[1] - 'A' + 1)
+	    || crop_valid(st->crop[2] - 'A', st->crop[3] - 'A' + 1);
+}
+
+/** Calculate edge crop gap, in pixels.
+ *
+ * @param total Width/height of window.
+ * @param gap Gap, in hundredths of percent of total (0.00 to 100.00) */
+static int crop_gap(gint total, uint32_t gap) {
+	return (gap > 0 && gap <= 10000) ? (total * gap / (10000 * 2)) : 0;
+}
+
+/** Get number of pixels to crop from edge.
+ *
+ * @param total Width/height of window.
+ * @param gap Gap, in hundredths of percent of total (0.00 to 100.00).
+ * @param idx Crop index, 'A' to 'H'.
+ * @param span Crop span, 'A' to 'H'. */
+static gint crop_pix(gint total, uint32_t gap, int idx, int span) {
+	int num = idx - 'A';
+	int den = span - 'A' + 1;
+	return (total > 0 && crop_valid(num, den))
+	     ? (total * num / den) + crop_gap(total, gap)
+	     : 0;
+}
+
+/** Get number of pixels to crop from top edge */
+static gint stream_crop_top(const struct stream *st, gint height) {
+	return crop_pix(height, st->vgap, st->crop[2], st->crop[3]);
+}
+
+/** Get number of pixels to crop from bottom edge */
+static gint stream_crop_bottom(const struct stream *st, gint height) {
+	return crop_pix(height, st->vgap, st->crop[2] + 1, st->crop[3]);
+}
+
+/** Get number of pixels to crop from left edge */
+static gint stream_crop_left(const struct stream *st, gint width) {
+	return crop_pix(width, st->hgap, st->crop[0], st->crop[1]);
+}
+
+/** Get number of pixels to crop from right edge */
+static gint stream_crop_right(const struct stream *st, gint width) {
+	return crop_pix(width, st->hgap, st->crop[0] + 1, st->crop[1]);
 }
 
 static bool stream_has_description(const struct stream *st) {
@@ -346,49 +403,15 @@ static GstElement *stream_find_videobox(struct stream *st) {
 	return gst_bin_get_by_name(bin, "vbox");
 }
 
-static gint videobox_span(gint total, uint32_t gap, int idx, int span) {
-	// Gap is hundredths of percent of total
-	int g = (gap > 0) ? (total * gap / (10000 / 2)) : 0;
-	return (idx > 0 && idx < 4 && span >= 2 && span <= 4)
-	     ? (idx * total / span) + g
-	     : -1;
-}
-
-static gint stream_videobox_top(struct stream *st, gint height) {
-	return videobox_span(height, st->vgap,
-		st->crop[2] - 'A',
-		(st->crop[3] - 'A') + 1);
-}
-
-static gint stream_videobox_bottom(struct stream *st, gint height) {
-	return videobox_span(height, st->vgap,
-		st->crop[3] - st->crop[2],
-		(st->crop[3] - 'A') + 1);
-}
-
-static gint stream_videobox_left(struct stream *st, gint width) {
-	return videobox_span(width, st->hgap,
-		st->crop[0] - 'A',
-		(st->crop[1] - 'A') + 1);
-}
-
-static gint stream_videobox_right(struct stream *st, gint width) {
-	return videobox_span(width, st->hgap,
-		st->crop[1] - st->crop[0],
-		(st->crop[1] - 'A') + 1);
-}
-
 static void stream_config_videobox(struct stream *st, gint width, gint height) {
 	GstElement *vbx = stream_find_videobox(st);
 	if (vbx) {
-		gint top = stream_videobox_top(st, height);
-		gint bottom = stream_videobox_bottom(st, height);
-		gint left = stream_videobox_left(st, width);
-		gint right = stream_videobox_right(st, width);
-		g_object_set(G_OBJECT(vbx), "top", top, NULL);
-		g_object_set(G_OBJECT(vbx), "bottom", bottom, NULL);
-		g_object_set(G_OBJECT(vbx), "left", left, NULL);
-		g_object_set(G_OBJECT(vbx), "right", right, NULL);
+		gpointer gobj = G_OBJECT(vbx);
+		g_object_set(gobj, "top", stream_crop_top(st, height), NULL);
+		g_object_set(gobj, "bottom", stream_crop_bottom(st, height),
+			NULL);
+		g_object_set(gobj, "left", stream_crop_left(st, width), NULL);
+		g_object_set(gobj, "right", stream_crop_right(st, width), NULL);
 		gst_object_unref(vbx);
 	}
 }
@@ -568,14 +591,6 @@ void stream_set_params(struct stream *st, nstr_t cam_id, nstr_t loc,
 
 void stream_set_font_size(struct stream *st, uint32_t sz) {
 	st->font_sz = sz;
-}
-
-void stream_set_crop(struct stream *st, nstr_t crop, uint32_t hgap,
-	uint32_t vgap)
-{
-	nstr_to_cstr(st->crop, sizeof(st->crop), crop);
-	st->hgap = hgap;
-	st->vgap = vgap;
 }
 
 /* Check sink to make sure that last-sample is updating.
