@@ -317,7 +317,7 @@ static void modebar_press(struct modebar *mbar, GdkEventKey *key) {
 		modebar_set_seq(mbar);
 	else if ('/' == k)
 		modebar_set_preset(mbar);
-	else if (8 == k)
+	else if ('\b' == k)
 		modebar_backspace(mbar);
 	else if ('\t' == k) {
 		modebar_hide(mbar);
