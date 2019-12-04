@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2018  Minnesota Department of Transportation
+ * Copyright (C) 2017-2019  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@ nstr_t nstr_init_empty(void) {
 
 /** Initialize a new nstr.
  *
- * @param buf     [in] Buffer for nstr to own.
- * @param buf_len [in] Length of nstr buffer.
+ * @param buf     Buffer for nstr to own.
+ * @param buf_len Length of nstr buffer.
  * @return Initialized nstr.
  */
 nstr_t nstr_init(char *buf, uint32_t buf_len) {
@@ -46,9 +46,9 @@ nstr_t nstr_init(char *buf, uint32_t buf_len) {
 
 /** Initialize a new nstr with an existing buffer.
  *
- * @param buf     [in] Buffer for nstr to own.
- * @param buf_len [in] Length of nstr buffer.
- * @param len     [in] Length of data in buffer.
+ * @param buf     Buffer for nstr to own.
+ * @param buf_len Length of nstr buffer.
+ * @param len     Length of data in buffer.
  * @return Initialized nstr.
  */
 nstr_t nstr_init_n(char *buf, uint32_t buf_len, uint32_t len) {
@@ -68,6 +68,12 @@ uint32_t nstr_len(nstr_t str) {
 	return str.len;
 }
 
+/** Append a string to another string.
+ *
+ * @param dst IN/OUT nstr to append to.
+ * @param src nstr to append.
+ * @return true if string was truncated.
+ */
 bool nstr_cat(nstr_t *dst, nstr_t src) {
 	uint32_t len = dst->len + src.len;
 	bool trunc = dst->buf_len <= len;
@@ -82,7 +88,7 @@ bool nstr_cat(nstr_t *dst, nstr_t src) {
 
 /** Append a C string (zero-terminated) to an nstr.
  *
- * @param dst nstr to append to.
+ * @param dst IN/OUT nstr to append to.
  * @param src C string to append.
  * @return true if string was truncated.
  */
@@ -102,8 +108,8 @@ bool nstr_cat_z(nstr_t *dst, const char *src) {
 
 /** Append a char to an nstr.
  *
- * @param dst nstr to append to.
- * @param c Character to append.
+ * @param dst IN/OUT nstr to append to.
+ * @param c   Character to append.
  * @return true if string was truncated.
  */
 bool nstr_cat_c(nstr_t *dst, char c) {
@@ -116,6 +122,12 @@ bool nstr_cat_c(nstr_t *dst, char c) {
 		return true;
 }
 
+/** Find a character within a string.
+ *
+ * @param str The string to search.
+ * @param c   Character to find.
+ * @return Offset of the character, or the string length if not found.
+ */
 static uint32_t nstr_find(nstr_t str, char c) {
 	for (uint32_t i = 0; i < str.len; i++) {
 		if (str.buf[i] == c)
@@ -124,6 +136,12 @@ static uint32_t nstr_find(nstr_t str, char c) {
 	return str.len;
 }
 
+/** Split a string on the first occurrence of a character.
+ *
+ * @param str IN/OUT string to split (updated to remainder of string).
+ * @param c   Character to split on.
+ * @return String ending before the character.
+ */
 nstr_t nstr_split(nstr_t *str, char c) {
 	char *buf = str->buf;
 	uint32_t i = nstr_find(*str, c);
@@ -137,11 +155,23 @@ nstr_t nstr_split(nstr_t *str, char c) {
 	return nstr_init_n(buf, i + 1, i);
 }
 
+/** Truncate a string on the first occurrence of a character.
+ *
+ * @param str String to truncate.
+ * @param c   Character to truncate on.
+ * @return String ending before the character.
+ */
 nstr_t nstr_chop(nstr_t str, char c) {
 	uint32_t i = nstr_find(str, c);
 	return nstr_init_n(str.buf, i + 1, i);
 }
 
+/** Check if a string is equal to a C string.
+ *
+ * @param str String to compare.
+ * @param buf C string to compare.
+ * @return true if strings are equal.
+ */
 bool nstr_cmp_z(nstr_t str, const char *buf) {
 	for (uint32_t i = 0; i < str.len; i++) {
 		if (str.buf[i] != buf[i])
@@ -150,6 +180,12 @@ bool nstr_cmp_z(nstr_t str, const char *buf) {
 	return buf[str.len] == '\0';
 }
 
+/** Check if two strings are equal.
+ *
+ * @param a First string.
+ * @param b Second string.
+ * @return true if strings are equal.
+ */
 bool nstr_equals(nstr_t a, nstr_t b) {
 	if (a.len == b.len) {
 		for (uint32_t i = 0; i < a.len; i++) {
@@ -161,6 +197,12 @@ bool nstr_equals(nstr_t a, nstr_t b) {
 	return false;
 }
 
+/** Check if a string has a C string prefix.
+ *
+ * @param str String to check.
+ * @param buf C string prefix.
+ * @return true if string starts with the prefix.
+ */
 bool nstr_starts_with(nstr_t str, const char *buf) {
 	for (uint32_t i = 0; i < str.len; i++) {
 		if ('\0' == buf[i])
@@ -172,6 +214,12 @@ bool nstr_starts_with(nstr_t str, const char *buf) {
 	return false;
 }
 
+/** Check if a string contains a C string.
+ *
+ * @param str String to check.
+ * @param buf C string.
+ * @return true if string contains the C string.
+ */
 bool nstr_contains(nstr_t str, const char *buf) {
 	while (str.len > 0) {
 		if (nstr_starts_with(str, buf))
@@ -200,9 +248,9 @@ const char *nstr_z(nstr_t str) {
 
 /** Copy an nstr to a C string (zero-terminated).
  *
- * @param dst [in,out] Destination buffer.
- * @param n   [in]     Length of destination buffer.
- * @param src [in]     String to copy.
+ * @param dst IN/OUT Destination buffer.
+ * @param n   Length of destination buffer.
+ * @param src String to copy.
  * @return true if string was truncated.
  */
 bool nstr_to_cstr(char *dst, size_t n, nstr_t src) {
@@ -213,6 +261,7 @@ bool nstr_to_cstr(char *dst, size_t n, nstr_t src) {
 	return trunc;
 }
 
+/** Parse a string as an unsigned integer */
 int32_t nstr_parse_u32(nstr_t str) {
 	char buf[16];
 	if (!nstr_to_cstr(buf, sizeof(buf), str))
@@ -221,6 +270,7 @@ int32_t nstr_parse_u32(nstr_t str) {
 		return -1;
 }
 
+/** Parse a hexadecimal digit */
 static int32_t parse_digit(char d) {
 	if (d >= '0' && d <= '9')
 		return d - '0';
@@ -232,6 +282,7 @@ static int32_t parse_digit(char d) {
 		return -1;
 }
 
+/** Parse a string as a hexadecimal integer */
 int32_t nstr_parse_hex(nstr_t hex) {
 	int32_t v = 0;
 	if (hex.len > 8)
@@ -246,6 +297,7 @@ int32_t nstr_parse_hex(nstr_t hex) {
 	return v;
 }
 
+/** Calculate an FNV hash of a string */
 uint64_t nstr_hash_fnv(nstr_t str) {
 	const void *key = str.buf;
 	const uint8_t *p = key;
