@@ -16,7 +16,7 @@ struct stream {
 	char		crop[6];         /* crop code */
 	char		cam_id[20];      /* camera ID */
 	char		location[128];
-	char		description[64];
+	char		description[64]; /* text overlay */
 	char		encoding[8];
 	char		sprops[64];
 	uint32_t	latency;

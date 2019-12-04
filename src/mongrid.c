@@ -316,10 +316,12 @@ static void moncell_set_handle(struct moncell *mc) {
 static void moncell_play_stream(struct moncell *mc, nstr_t cam_id, nstr_t loc,
 	nstr_t desc, nstr_t encoding, uint32_t latency, nstr_t sprops)
 {
-	nstr_t d = moncell_has_title(mc) ? nstr_init_empty() : desc;
+	/* Only set text overlay description when there's no title bar */
+	nstr_t dtxt = moncell_has_title(mc) ? nstr_init_empty() : desc;
 	mc->failed = FALSE;
 	moncell_set_description(mc, desc);
-	stream_set_params(&mc->stream, cam_id, loc, d, encoding, latency, sprops);
+	stream_set_params(&mc->stream, cam_id, loc, dtxt, encoding, latency,
+		sprops);
 	/* Stopping the stream will trigger a restart */
 	moncell_stop_stream(mc, 20);
 }
