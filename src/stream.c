@@ -232,44 +232,50 @@ static bool stream_has_crop(const struct stream *st) {
 
 /** Calculate edge crop gap, in pixels.
  *
- * @param total Width/height of window.
+ * @param pix Pixel width/height of cropped view.
  * @param gap Gap, in hundredths of percent of total (0.00 to 100.00) */
-static int crop_gap(gint total, uint32_t gap) {
-	return (gap > 0 && gap <= 10000) ? (total * gap / (10000 * 2)) : 0;
+static int crop_gap(gint pix, uint32_t gap) {
+	return (gap > 0 && gap <= 10000) ? (pix * gap / (10000 * 2)) : 0;
 }
 
 /** Get number of pixels to crop from edge.
  *
  * @param total Width/height of window.
- * @param gap Gap, in hundredths of percent of total (0.00 to 100.00).
- * @param idx Crop index, 'A' to 'H'.
- * @param span Crop span, 'A' to 'H'. */
-static gint crop_pix(gint total, uint32_t gap, int idx, int span) {
-	int num = idx - 'A';
-	int den = span - 'A' + 1;
+ * @param num Window fraction numerator, 0 to 7.
+ * @param den Window fraction denominator, 1 to 8.
+ * @param gap Gap, in hundredths of percent of window (0.00 to 100.00). */
+static gint crop_pix(gint total, int num, int den, uint32_t gap) {
 	return (total > 0 && crop_valid(num, den))
-	     ? (total * num / den) + crop_gap(total, gap)
-	     : 0;
+	      ? (total * num / den) + crop_gap(total / den, gap)
+	      : 0;
 }
 
 /** Get number of pixels to crop from top edge */
 static gint stream_crop_top(const struct stream *st, gint height) {
-	return crop_pix(height, st->vgap, st->crop[2], st->crop[3]);
+	int num = st->crop[2] - 'A';
+	int den = st->crop[3] - 'A' + 1;
+	return crop_pix(height, num, den, st->vgap);
 }
 
 /** Get number of pixels to crop from bottom edge */
 static gint stream_crop_bottom(const struct stream *st, gint height) {
-	return crop_pix(height, st->vgap, st->crop[2] + 1, st->crop[3]);
+	int num = st->crop[3] - st->crop[2];
+	int den = st->crop[3] - 'A' + 1;
+	return crop_pix(height, num, den, st->vgap);
 }
 
 /** Get number of pixels to crop from left edge */
 static gint stream_crop_left(const struct stream *st, gint width) {
-	return crop_pix(width, st->hgap, st->crop[0], st->crop[1]);
+	int num = st->crop[0] - 'A';
+	int den = st->crop[1] - 'A' + 1;
+	return crop_pix(width, num, den, st->hgap);
 }
 
 /** Get number of pixels to crop from right edge */
 static gint stream_crop_right(const struct stream *st, gint width) {
-	return crop_pix(width, st->hgap, st->crop[0] + 1, st->crop[1]);
+	int num = st->crop[1] - st->crop[0];
+	int den = st->crop[1] - 'A' + 1;
+	return crop_pix(width, num, den, st->hgap);
 }
 
 static bool stream_has_description(const struct stream *st) {
