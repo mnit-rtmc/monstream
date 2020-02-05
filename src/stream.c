@@ -82,6 +82,7 @@ static GstElement *stream_create_sink(const struct stream *st) {
 static GstElement *stream_create_real_sink(struct stream *st) {
 	GstElement *sink = stream_create_sink(st);
 	if (sink != NULL) {
+		g_object_set(G_OBJECT(sink), "sync", FALSE, NULL);
 		GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 		gst_video_overlay_set_window_handle(overlay, st->handle);
 		g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect,
@@ -106,11 +107,12 @@ static void stream_add_text(struct stream *st) {
 	g_object_set(G_OBJECT(txt), "font-desc", font, NULL);
 	g_object_set(G_OBJECT(txt), "shaded-background", FALSE, NULL);
 	g_object_set(G_OBJECT(txt), "color", 0xFFFFFFE0, NULL);
-	g_object_set(G_OBJECT(txt), "halignment", 0, NULL); // left
+	g_object_set(G_OBJECT(txt), "halignment", 2, NULL); // right
 	g_object_set(G_OBJECT(txt), "valignment", 2, NULL); // top
 	g_object_set(G_OBJECT(txt), "wrap-mode", -1, NULL); // no wrapping
 	g_object_set(G_OBJECT(txt), "xpad", 48, NULL);
 	g_object_set(G_OBJECT(txt), "ypad", 36, NULL);
+	g_object_set(G_OBJECT(txt), "scale-mode", 2, NULL); // display
 	stream_add(st, txt);
 }
 
