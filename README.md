@@ -21,6 +21,20 @@ dnf install gtk3-devel gstreamer1-devel gstreamer1-plugins-base-devel libcurl-de
 
 To build MonStream, run `make` in the repository root.
 
+Building on Ubuntu with the repo stored in /opt/ can be accomplished with the following:
+
+```Bash
+sudo apt install git gcc make libcurl4-openssl-dev libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+cd /opt/
+git clone https://github.com/mnit-rtmc/monstream.git
+pushd monstream
+make
+popd
+sudo ln -s /opt/monstream/monstream /usr/bin/monstream
+```
+
+Tested on Ubuntu 20.04 ARM. Make sure to change permissions appropriately.
+
 ### Configuration
 
 The `/var/lib/monstream` directory is used for caching data.  Create it and give
