@@ -41,7 +41,7 @@ configuration is completed.
 2. Monitor index
 3. Camera ID
 4. Stream request URI
-5. Encoding: `MPEG2`, `MPEG4`, `H264`, `PNG`
+5. Encoding: `MPEG2`, `MPEG4`, `H264`, `PNG`, `MJPEG`
 6. Title: ASCII text description
 7. Latency (0-2000 ms)
 
