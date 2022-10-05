@@ -2,7 +2,7 @@
 
 MonStream is a video monitor streaming application.  It can stream multicast
 or unicast video and display it full screen, or in a grid of 2x2, 2x3, etc.
-It is controlled through a UDP protocol with short text messages.
+It is controlled through a UDP [protocol] with short text messages.
 
 ## Installation
 
@@ -41,7 +41,7 @@ sudo ln -s /opt/monstream/monstream /usr/bin/monstream
 Tested on Ubuntu 20.04 with Desktop ARM64 and AMD64.  Plays well with Wayland
 and X11 out of the box.
 
-### Configuration
+## Configuration
 
 The `/var/lib/monstream` directory is used for caching data.  Create it and give
 the monstream user write access:
@@ -59,5 +59,5 @@ These files are managed automatically and are not meant to be edited:
 * `play.0` .. `play.n` - Stream information for each monitor
 * `cache` - Directory containing SDP files for known streams
 
-See doc/protocol.md for more information on constructing messages that are used
-to manage monstream.
+
+[protocol]: doc/protocol.md
