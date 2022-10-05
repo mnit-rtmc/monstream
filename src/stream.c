@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2020  Minnesota Department of Transportation
+ * Copyright (C) 2017-2022  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -82,7 +82,8 @@ static GstElement *stream_create_sink(const struct stream *st) {
 static GstElement *stream_create_real_sink(struct stream *st) {
 	GstElement *sink = stream_create_sink(st);
 	if (sink != NULL) {
-		g_object_set(G_OBJECT(sink), "sync", FALSE, NULL);
+		// Playback sometimes stutters without "sync" enabled
+		g_object_set(G_OBJECT(sink), "sync", TRUE, NULL);
 		GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
 		gst_video_overlay_set_window_handle(overlay, st->handle);
 		g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect,
