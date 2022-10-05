@@ -318,6 +318,14 @@ static GstElement *stream_create_h264dec(const struct stream *st) {
 	}
 }
 
+static bool stream_is_encoding_ok(const struct stream *st) {
+	return (strcmp("H264", st->encoding) == 0) ||
+	       (strcmp("MPEG4", st->encoding) == 0) ||
+	       (strcmp("PNG", st->encoding) == 0) ||
+	       (strcmp("MJPEG", st->encoding) == 0) ||
+	       (strcmp("MPEG2", st->encoding) == 0);
+}
+
 static void stream_add_h264(struct stream *st) {
 	stream_add(st, stream_create_h264dec(st));
 	stream_add(st, gst_element_factory_make("rtph264depay", NULL));
@@ -330,6 +338,7 @@ static void stream_add_png(struct stream *st) {
 }
 
 static void stream_add_later_elements(struct stream *st) {
+	assert(stream_is_encoding_ok(st));
 	stream_add_sink(st);
 	// NOTE: MJPEG and textoverlay don't play well together,
 	//       due to timestamp issues.
@@ -346,13 +355,12 @@ static void stream_add_later_elements(struct stream *st) {
 		stream_add_png(st);
 	} else if (strcmp("MJPEG", st->encoding) == 0) {
 		stream_add(st, gst_element_factory_make("jpegdec", NULL));
-	} else if (strcmp("MPEG2", st->encoding) == 0) {
+	} else {
 		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
 		stream_add(st, gst_element_factory_make("tsdemux", NULL));
 		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
 		stream_add_queue(st);
-	} else
-		elog_err("Invalid encoding: %s\n", st->encoding);
+	}
 }
 
 static void stream_add_udp_pipe(struct stream *st) {
@@ -691,6 +699,10 @@ bool stream_start(struct stream *st) {
 	stream_stop_pipeline(st);
 	if (!stream_is_location_ok(st)) {
 		elog_err("Invalid location: %s\n", st->location);
+		return false;
+	}
+	if (!stream_is_encoding_ok(st)) {
+		elog_err("Invalid encoding: %s\n", st->encoding);
 		return false;
 	}
 	stream_start_pipe(st);
