@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <assert.h>
 #include <stdio.h>
 #include <gst/video/video.h>
 #include <gst/video/videooverlay.h>
@@ -296,6 +297,10 @@ static bool stream_is_rtsp(const struct stream *st) {
 	return strncmp("rtsp://", st->location, 7) == 0;
 }
 
+static bool stream_is_location_ok(const struct stream *st) {
+	return stream_is_udp(st) || stream_is_http(st) || stream_is_rtsp(st);
+}
+
 static void stream_add_mpeg4(struct stream *st) {
 	GstElement *dec = gst_element_factory_make("avdec_mpeg4", NULL);
 	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
@@ -357,17 +362,14 @@ static void stream_add_udp_pipe(struct stream *st) {
 }
 
 static void stream_start_pipeline(struct stream *st) {
+	assert(stream_is_location_ok(st));
 	stream_add_later_elements(st);
 	if (stream_is_udp(st))
 		stream_add_udp_pipe(st);
 	else if (stream_is_http(st))
 		stream_add_src_http(st);
-	else if (stream_is_rtsp(st))
+	else
 		stream_add_src_rtsp(st);
-	else {
-		elog_err("Invalid location: %s\n", st->location);
-		return;
-	}
 	gst_element_set_state(st->pipeline, GST_STATE_PLAYING);
 }
 
@@ -687,11 +689,12 @@ static void stream_start_pipe(struct stream *st) {
 bool stream_start(struct stream *st) {
 	/* Make sure pipeline is not running */
 	stream_stop_pipeline(st);
-	if (st->location[0]) {
-		stream_start_pipe(st);
-		return true;
-	} else
+	if (!stream_is_location_ok(st)) {
+		elog_err("Invalid location: %s\n", st->location);
 		return false;
+	}
+	stream_start_pipe(st);
+	return true;
 }
 
 void stream_stop(struct stream *st) {
