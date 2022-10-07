@@ -76,6 +76,7 @@ For dedicated workstations, a joystick and keyboard can be used for pan / tilt /
 zoom control and switching.  The switching functions can all be performed on
 a dedicated USB numeric keypad.
 
+Key                           | Function
 ------------------------------|----------------------------------------
 <kbd>0</kbd> ... <kbd>9</kbd> | Add digit to __entry__ (up to 5 digits)
 <kbd>Backspace</kbd>          | Remove final digit of __entry__
