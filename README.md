@@ -1,8 +1,11 @@
 # MonStream
 
-MonStream is a video monitor streaming application.  It can stream multicast
-or unicast video and display it full screen, or in a grid of 2x2, 2x3, etc.
-It is controlled through a UDP [protocol] with short text messages.
+MonStream is a streaming application for live video display on dedicated
+monitors.  It can stream video from unicast or multicast sources in MPEG2,
+MPEG4, H264 and motion JPEG formats.  Streams can be displayed in a grid of 2x2,
+2x3, etc.
+
+It is controlled by [IRIS] through a UDP [protocol] with short text messages.
 
 ## Dependencies
 
@@ -67,5 +70,28 @@ Usage: monstream [option]
   --sink XVIMAGE  Configure xvimage sink (no acceleration)
 ```
 
+## Control
 
+For dedicated workstations, a joystick and keyboard can be used for pan / tilt /
+zoom control and switching.  The switching functions can all be performed on
+a dedicated USB numeric keypad.
+
+------------------------------|----------------------------------------
+<kbd>0</kbd> ... <kbd>9</kbd> | Add digit to __entry__ (up to 5 digits)
+<kbd>Backspace</kbd>          | Remove final digit of __entry__
+<kbd>.</kbd>                  | Change selected monitor to __entry__
+<kbd>Enter</kbd>              | Switch camera to __entry__
+<kbd>-</kbd>                  | Switch to "upstream" camera
+<kbd>+</kbd>                  | Switch to "downstream" camera
+<kbd>`*`</kbd>                | Start / pause sequence __entry__
+<kbd>/</kbd>                  | Recall preset __entry__
+<kbd>Tab</kbd>                | Hide on-screen control bar
+
+A joystick can be used to control the currently selected camera.  Pressing
+_left_ and _right_ sends pan commands, while _up_ and _down_ causes the camera
+to tilt.  Some models have a third axis for zoom, which can be controlled by
+twisting the joystick.
+
+
+[IRIS]: https://github.com/mnit-rtmc/iris
 [protocol]: doc/protocol.md
