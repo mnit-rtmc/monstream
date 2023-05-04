@@ -25,7 +25,7 @@ sudo dnf install gtk3-devel gstreamer1-devel gstreamer1-plugins-base-devel libcu
 __Ubuntu__:
 
 ```bash
-sudo apt install git gcc make libcurl4-openssl-dev libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad gstreamer1.0-libav 
+sudo apt install git gcc make libcurl4-openssl-dev libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-bad gstreamer1.0-libav
 ```
 
 ## Building

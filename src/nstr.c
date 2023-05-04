@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2019  Minnesota Department of Transportation
+ * Copyright (C) 2017-2023  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -274,10 +274,10 @@ int32_t nstr_parse_u32(nstr_t str) {
 static int32_t parse_digit(char d) {
 	if (d >= '0' && d <= '9')
 		return d - '0';
-	else if (d >= 'A' && d <= 'Z')
-		return d - 'A';
-	else if (d >= 'a' && d <= 'z')
-		return d - 'a';
+	else if (d >= 'A' && d <= 'F')
+		return 10 + d - 'A';
+	else if (d >= 'a' && d <= 'f')
+		return 10 + d - 'a';
 	else
 		return -1;
 }
