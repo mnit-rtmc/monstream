@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2022  Minnesota Department of Transportation
+ * Copyright (C) 2017-2023  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,6 +28,19 @@
 #define STREAM_NUM_VIDEO	(0)
 
 static const uint32_t DEFAULT_LATENCY = 50;
+
+static GstElement *make_element(const char *factory_name, const char *name) {
+	GstElementFactory *factory = gst_element_factory_find(factory_name);
+	if (!factory) {
+		elog_err("Factory %s not found\n", factory_name);
+		return NULL;
+	}
+	GstElement *elem = gst_element_factory_create(factory, name);
+	gst_object_unref(factory);
+	if (!elem)
+		elog_err("Failed to create %s element\n", factory_name);
+	return elem;
+}
 
 static int stream_elem_next(const struct stream *st) {
 	int i = 0;
@@ -65,7 +78,7 @@ static void stream_link(struct stream *st, int i) {
 }
 
 static void stream_add(struct stream *st, GstElement *elem) {
-	if (gst_bin_add(GST_BIN(st->pipeline), elem)) {
+	if (elem != NULL && gst_bin_add(GST_BIN(st->pipeline), elem)) {
 		int i = stream_elem_next(st);
 		st->elem[i] = elem;
 		if (i > 0)
@@ -76,8 +89,8 @@ static void stream_add(struct stream *st, GstElement *elem) {
 
 static GstElement *stream_create_sink(const struct stream *st) {
 	return (strcmp("VAAPI", st->sink_name) == 0)
-	      ? gst_element_factory_make("vaapisink", NULL)
-	      : gst_element_factory_make("xvimagesink", NULL);
+	      ? make_element("vaapisink", NULL)
+	      : make_element("xvimagesink", NULL);
 }
 
 static GstElement *stream_create_real_sink(struct stream *st) {
@@ -90,6 +103,8 @@ static GstElement *stream_create_real_sink(struct stream *st) {
 		g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect,
 			NULL);
 		st->sink = sink;
+	} else {
+		elog_err("Sink element not created!\n");
 	}
 	return sink;
 }
@@ -97,14 +112,14 @@ static GstElement *stream_create_real_sink(struct stream *st) {
 static void stream_add_sink(struct stream *st) {
 	GstElement *sink = (st->handle)
 	      ? stream_create_real_sink(st)
-	      : gst_element_factory_make("fakesink", NULL);
+	      : make_element("fakesink", NULL);
 	stream_add(st, sink);
 }
 
 static void stream_add_text(struct stream *st) {
 	char font[32];
 	snprintf(font, sizeof(font), "Overpass, Bold %d", st->font_sz);
-	GstElement *txt = gst_element_factory_make("textoverlay", NULL);
+	GstElement *txt = make_element("textoverlay", NULL);
 	g_object_set(G_OBJECT(txt), "text", st->description, NULL);
 	g_object_set(G_OBJECT(txt), "font-desc", font, NULL);
 	g_object_set(G_OBJECT(txt), "shaded-background", FALSE, NULL);
@@ -119,13 +134,13 @@ static void stream_add_text(struct stream *st) {
 }
 
 static void stream_add_queue(struct stream *st) {
-	GstElement *que = gst_element_factory_make("queue", NULL);
+	GstElement *que = make_element("queue", NULL);
 	g_object_set(G_OBJECT(que), "max-size-time", 650000000, NULL);
 	stream_add(st, que);
 }
 
 static void stream_add_jitter(struct stream *st) {
-	GstElement *jtr = gst_element_factory_make("rtpjitterbuffer", NULL);
+	GstElement *jtr = make_element("rtpjitterbuffer", NULL);
 	g_object_set(G_OBJECT(jtr), "latency", st->latency, NULL);
 	g_object_set(G_OBJECT(jtr), "max-dropout-time", 1500, NULL);
 	stream_add(st, jtr);
@@ -153,7 +168,7 @@ static GstCaps *stream_create_caps(const struct stream *st) {
 }
 
 static void stream_add_filter(struct stream *st) {
-	GstElement *fltr = gst_element_factory_make("capsfilter", NULL);
+	GstElement *fltr = make_element("capsfilter", NULL);
 	GstCaps *caps = stream_create_caps(st);
 	g_object_set(G_OBJECT(fltr), "caps", caps, NULL);
 	gst_caps_unref(caps);
@@ -161,7 +176,7 @@ static void stream_add_filter(struct stream *st) {
 }
 
 static void stream_add_src_udp(struct stream *st) {
-	GstElement *src = gst_element_factory_make("udpsrc", NULL);
+	GstElement *src = make_element("udpsrc", NULL);
 	g_object_set(G_OBJECT(src), "uri", st->location, NULL);
 	// Post GstUDPSrcTimeout messages after 2 seconds (ns)
 	g_object_set(G_OBJECT(src), "timeout", 2 * ONE_SEC_NS, NULL);
@@ -182,7 +197,7 @@ static const char *stream_location_http(const struct stream *st) {
 }
 
 static void stream_add_src_http(struct stream *st) {
-	GstElement *src = gst_element_factory_make("souphttpsrc", NULL);
+	GstElement *src = make_element("souphttpsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", stream_location_http(st), NULL);
 	g_object_set(G_OBJECT(src), "timeout", 2, NULL);
 	g_object_set(G_OBJECT(src), "retries", 0, NULL);
@@ -201,7 +216,7 @@ static gboolean select_stream_cb(GstElement *src, guint num, GstCaps *caps,
 }
 
 static void stream_add_src_rtsp(struct stream *st) {
-	GstElement *src = gst_element_factory_make("rtspsrc", NULL);
+	GstElement *src = make_element("rtspsrc", NULL);
 	g_object_set(G_OBJECT(src), "location", st->location, NULL);
 	g_object_set(G_OBJECT(src), "latency", st->latency, NULL);
 	g_object_set(G_OBJECT(src), "timeout", ONE_SEC_US, NULL);
@@ -302,17 +317,17 @@ static bool stream_is_location_ok(const struct stream *st) {
 }
 
 static void stream_add_mpeg4(struct stream *st) {
-	GstElement *dec = gst_element_factory_make("avdec_mpeg4", NULL);
+	GstElement *dec = make_element("avdec_mpeg4", NULL);
 	g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
 	stream_add(st, dec);
-	stream_add(st, gst_element_factory_make("rtpmp4vdepay", NULL));
+	stream_add(st, make_element("rtpmp4vdepay", NULL));
 }
 
 static GstElement *stream_create_h264dec(const struct stream *st) {
 	if (strcmp("VAAPI", st->sink_name) == 0) {
-		return gst_element_factory_make("vaapih264dec", NULL);
+		return make_element("vaapih264dec", NULL);
 	} else {
-		GstElement *dec = gst_element_factory_make("avdec_h264", NULL);
+		GstElement *dec = make_element("avdec_h264", NULL);
 		g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
 		return dec;
 	}
@@ -328,13 +343,13 @@ static bool stream_is_encoding_ok(const struct stream *st) {
 
 static void stream_add_h264(struct stream *st) {
 	stream_add(st, stream_create_h264dec(st));
-	stream_add(st, gst_element_factory_make("rtph264depay", NULL));
+	stream_add(st, make_element("rtph264depay", NULL));
 }
 
 static void stream_add_png(struct stream *st) {
-	stream_add(st, gst_element_factory_make("imagefreeze", NULL));
-	stream_add(st, gst_element_factory_make("videoconvert", NULL));
-	stream_add(st, gst_element_factory_make("pngdec", NULL));
+	stream_add(st, make_element("imagefreeze", NULL));
+	stream_add(st, make_element("videoconvert", NULL));
+	stream_add(st, make_element("pngdec", NULL));
 }
 
 static void stream_add_later_elements(struct stream *st) {
@@ -342,11 +357,10 @@ static void stream_add_later_elements(struct stream *st) {
 	stream_add_sink(st);
 	// NOTE: MJPEG and textoverlay don't play well together,
 	//       due to timestamp issues.
-	if (stream_has_description(st) && strcmp("MJPEG", st->encoding) != 0) {
+	if (stream_has_description(st) && strcmp("MJPEG", st->encoding) != 0)
 		stream_add_text(st);
-	}
 	if (stream_has_crop(st))
-		stream_add(st, gst_element_factory_make("videobox", "vbox"));
+		stream_add(st, make_element("videobox", "vbox"));
 	if (strcmp("H264", st->encoding) == 0) {
 		stream_add_h264(st);
 	} else if (strcmp("MPEG4", st->encoding) == 0) {
@@ -354,11 +368,11 @@ static void stream_add_later_elements(struct stream *st) {
 	} else if (strcmp("PNG", st->encoding) == 0) {
 		stream_add_png(st);
 	} else if (strcmp("MJPEG", st->encoding) == 0) {
-		stream_add(st, gst_element_factory_make("jpegdec", NULL));
+		stream_add(st, make_element("jpegdec", NULL));
 	} else {
-		stream_add(st, gst_element_factory_make("mpeg2dec", NULL));
-		stream_add(st, gst_element_factory_make("tsdemux", NULL));
-		stream_add(st, gst_element_factory_make("rtpmp2tdepay", NULL));
+		stream_add(st, make_element("mpeg2dec", NULL));
+		stream_add(st, make_element("tsdemux", NULL));
+		stream_add(st, make_element("rtpmp2tdepay", NULL));
 		stream_add_queue(st);
 	}
 }
