@@ -9,5 +9,6 @@ nstr_t config_load(const char *name, nstr_t str);
 nstr_t config_load_cache(uint64_t hash, nstr_t str);
 ssize_t config_store(const char *name, nstr_t str);
 ssize_t config_store_cache(uint64_t hash, nstr_t str);
+void config_test();
 
 #endif

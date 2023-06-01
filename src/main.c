@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2022  Minnesota Department of Transportation
+ * Copyright (C) 2017-2023  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,8 +39,6 @@ int main(int argc, char* argv[]) {
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--no-gui") == 0)
 			gui = false;
-		else if (strcmp(argv[i], "--stats") == 0)
-			stats = true;
 		else if (strcmp(argv[i], "--sink") == 0) {
 			i++;
 			str = nstr_init(buf, sizeof(buf));
@@ -56,6 +54,11 @@ int main(int argc, char* argv[]) {
 		} else if (strcmp(argv[i], "--port") == 0) {
 			i++;
 			port = argv[i];
+		} else if (strcmp(argv[i], "--stats") == 0)
+			stats = true;
+		else if (strcmp(argv[i], "--test") == 0) {
+			config_test();
+			goto out;
 		} else if (strcmp(argv[i], "--version") == 0)
 			goto out;
 		else {

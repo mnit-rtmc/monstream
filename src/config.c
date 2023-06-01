@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017  Minnesota Department of Transportation
+ * Copyright (C) 2017-2023  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -135,4 +135,41 @@ ssize_t config_store_cache(uint64_t hash, nstr_t str) {
 	return config_store(path, str);
 err:
 	return -1;
+}
+
+/* Test config */
+static char *CONFIG = "config" "\x1F"
+                      "1" "\x1E";
+
+/* Test monitor */
+static char *MONITOR = "monitor" "\x1F"
+                       "0" "\x1F"
+                       "TEST" "\x1F"
+                       "FF44FF" "\x1F"
+                       "1" "\x1F"
+                       "20" "\x1F"
+                       "AAAA" "\x1F"
+                       "0" "\x1F"
+                       "0" "\x1F"
+                       "\x1F" "\x1E";
+
+/* Test play */
+static char *PLAY = "play" "\x1F"
+                    "0" "\x1F"
+                    "1" "\x1F"
+                    "rtsp://127.0.0.1:8554/stream" "\x1F"
+                    "H264" "\x1F"
+                    "Test Video" "\x1F"
+                    "500" "\x1E";
+
+void config_test() {
+	int n = strlen(CONFIG);
+	nstr_t config = nstr_init_n(CONFIG, n, n);
+	config_store("config", config);
+	n = strlen(MONITOR);
+	nstr_t monitor = nstr_init_n(MONITOR, n, n);
+	config_store("monitor.0", monitor);
+	n = strlen(PLAY);
+	nstr_t play = nstr_init_n(PLAY, n, n);
+	config_store("play.0", play);
 }
