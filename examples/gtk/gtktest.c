@@ -23,16 +23,6 @@ static void error_cb(GstBus *bus, GstMessage *msg, gpointer user_data) {
 
 static GtkWidget *app_sink_widget(struct App *app) {
   GstElement *sink = gst_bin_get_by_name(GST_BIN(app->pipeline), "vsink");
-  if (!sink && !g_strcmp0(G_OBJECT_TYPE_NAME(app->pipeline), "GstPlayBin")) {
-    g_object_get(app->pipeline, "video-sink", &sink, NULL);
-    if (sink && g_strcmp0(G_OBJECT_TYPE_NAME(sink), "GstGtkWaylandSink") != 0
-        && GST_IS_BIN(sink))
-    {
-      GstBin *sinkbin = GST_BIN(sink);
-      sink = gst_bin_get_by_name(sinkbin, "vsink");
-      gst_object_unref(sinkbin);
-    }
-  }
   g_assert(sink);
 
   GtkWidget *widget;
@@ -68,9 +58,11 @@ int main(int argc, char **argv) {
       "playbin video-sink=\"gtksink name=vsink\"", NULL);
     g_object_set(app->pipeline, "uri", argv[1], NULL);
   } else {
-      app->pipeline = gst_parse_launch("videotestsrc pattern=18 "
-          "background-color=0xFF0088AA ! videoconvert ! "
-          "gtksink name=vsink", NULL);
+    app->pipeline = gst_parse_launch(
+      "videotestsrc pattern=18 background-color=0xFF0088AA ! "
+      "videoconvert ! "
+      "gtksink name=vsink",
+      NULL);
   }
 
   build_window(app);
