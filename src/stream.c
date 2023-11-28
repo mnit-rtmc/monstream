@@ -87,14 +87,8 @@ static void stream_add(struct stream *st, GstElement *elem) {
 		elog_err("Element not added to pipeline\n");
 }
 
-static GstElement *stream_create_sink(const struct stream *st) {
-	return (strcmp("VAAPI", st->sink_name) == 0)
-	      ? make_element("vaapisink", NULL)
-	      : make_element("xvimagesink", NULL);
-}
-
 static GstElement *stream_create_real_sink(struct stream *st) {
-	GstElement *sink = stream_create_sink(st);
+	GstElement *sink = make_element("xvimagesink", NULL);
 	if (sink != NULL) {
 		// Playback sometimes stutters without "sync" enabled
 		g_object_set(G_OBJECT(sink), "sync", TRUE, NULL);
@@ -324,13 +318,9 @@ static void stream_add_mpeg4(struct stream *st) {
 }
 
 static GstElement *stream_create_h264dec(const struct stream *st) {
-	if (strcmp("VAAPI", st->sink_name) == 0) {
-		return make_element("vaapih264dec", NULL);
-	} else {
-		GstElement *dec = make_element("avdec_h264", NULL);
-		g_object_set(G_OBJECT(dec), "output-corrupt", FALSE, NULL);
-		return dec;
-	}
+	return (strcmp("VAAPI", st->sink_name) == 0)
+	      ? make_element("vaapih264dec", NULL)
+	      : make_element("openh264dec", NULL);
 }
 
 static bool stream_is_encoding_ok(const struct stream *st) {
@@ -343,6 +333,7 @@ static bool stream_is_encoding_ok(const struct stream *st) {
 
 static void stream_add_h264(struct stream *st) {
 	stream_add(st, stream_create_h264dec(st));
+	stream_add(st, make_element("h264parse", NULL));
 	stream_add(st, make_element("rtph264depay", NULL));
 }
 
