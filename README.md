@@ -22,6 +22,13 @@ __Fedora__:
 sudo dnf install gtk3-devel gstreamer1-devel gstreamer1-plugins-base-devel libcurl-devel
 ```
 
+To enable [OpenH264]:
+
+```bash
+sudo dnf config-manager --set-enabled fedora-cisco-openh264
+sudo dnf install gstreamer1-plugin-openh264
+```
+
 __Ubuntu__:
 
 ```bash
@@ -95,4 +102,5 @@ twisting the joystick.
 
 
 [IRIS]: https://github.com/mnit-rtmc/iris
+[OpenH264]: https://docs.fedoraproject.org/en-US/quick-docs/openh264/#_installation_from_fedora_cisco_openh264_repository
 [protocol]: doc/protocol.md
