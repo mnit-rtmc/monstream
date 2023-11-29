@@ -19,8 +19,8 @@
 #include "config.h"
 #include "nstr.h"
 
-#define VERSION "1.12"
-#define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2022  MnDOT\n"
+#define VERSION "1.13"
+#define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2023  MnDOT\n"
 
 static char *SINK_VAAPI = "sink\x1FVAAPI\x1E";
 static char *SINK_XVIMAGE = "sink\x1FXVIMAGE\x1E";
