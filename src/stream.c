@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2023  Minnesota Department of Transportation
+ * Copyright (C) 2017-2024  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -87,15 +87,21 @@ static void stream_add(struct stream *st, GstElement *elem) {
 		elog_err("Element not added to pipeline\n");
 }
 
+static bool stream_is_vaapi(const struct stream *st) {
+	return strcmp("VAAPI", st->sink_name) == 0;
+}
+
 static GstElement *stream_create_real_sink(struct stream *st) {
-	GstElement *sink = make_element("xvimagesink", NULL);
+	GstElement *sink = stream_is_vaapi(st)
+	      ? make_element("glimagesink", NULL)
+	      : make_element("xvimagesink", NULL);
 	if (sink != NULL) {
 		// Playback sometimes stutters without "sync" enabled
 		g_object_set(G_OBJECT(sink), "sync", TRUE, NULL);
-		GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
-		gst_video_overlay_set_window_handle(overlay, st->handle);
 		g_object_set(G_OBJECT(sink), "force-aspect-ratio", st->aspect,
 			NULL);
+		GstVideoOverlay *overlay = GST_VIDEO_OVERLAY(sink);
+		gst_video_overlay_set_window_handle(overlay, st->handle);
 		st->sink = sink;
 	} else {
 		elog_err("Sink element not created!\n");
@@ -318,7 +324,7 @@ static void stream_add_mpeg4(struct stream *st) {
 }
 
 static GstElement *stream_create_h264dec(const struct stream *st) {
-	return (strcmp("VAAPI", st->sink_name) == 0)
+	return stream_is_vaapi(st)
 	      ? make_element("vaapih264dec", NULL)
 	      : make_element("openh264dec", NULL);
 }
