@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2023  Minnesota Department of Transportation
+ * Copyright (C) 2017-2025  Minnesota Department of Transportation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
 #include "config.h"
 #include "nstr.h"
 
-#define VERSION "1.13"
-#define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2023  MnDOT\n"
+#define VERSION "1.14"
+#define BANNER "monstream: v" VERSION "  Copyright (C) 2017-2025  MnDOT\n"
 
 static char *SINK_VAAPI = "sink\x1FVAAPI\x1E";
 static char *SINK_XVIMAGE = "sink\x1FXVIMAGE\x1E";
